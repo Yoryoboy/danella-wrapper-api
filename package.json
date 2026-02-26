@@ -1,0 +1,23 @@
+{
+  "name": "danella-wrapper-api",
+  "version": "1.0.0",
+  "description": "Danella-X API wrapper exploration scripts",
+  "main": "index.js",
+  "scripts": {
+    "probe:auth-task": "tsx scripts/probe-auth-task.ts",
+    "test": "echo \"No tests configured yet\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.5",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
