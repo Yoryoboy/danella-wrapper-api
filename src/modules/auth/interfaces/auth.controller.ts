@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 
 import { AppError } from "../../../shared/domain/app-error";
+import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-header";
 import type { LoginUseCase, LogoutUseCase, ValidateSessionUseCase } from "../application";
 import { cookieAuthBodySchema, loginBodySchema } from "./auth.schemas";
 
@@ -17,17 +18,7 @@ export class AuthController {
       return bodyParse.data.auth.cookieHeader;
     }
 
-    const customHeader = req.header("x-danella-cookie");
-    if (typeof customHeader === "string" && customHeader.trim().length > 0) {
-      return customHeader.trim();
-    }
-
-    const standardCookieHeader = req.header("cookie");
-    if (typeof standardCookieHeader === "string" && standardCookieHeader.trim().length > 0) {
-      return standardCookieHeader.trim();
-    }
-
-    return null;
+    return getCookieHeader(req);
   }
 
   login: RequestHandler = async (req, res, next) => {

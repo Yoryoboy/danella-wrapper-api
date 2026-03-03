@@ -553,3 +553,33 @@ Artifact JSON: `none (captured from browser devtools inspection)`
 Artifact JSON: `none (local wrapper smoke test)`
 
 ---
+## Run 2026-03-03 (Refactor Validation - Shared Utilities and Stronger Typing)
+
+### Refactor Scope Verified
+- Shared utilities introduced and wired in module clients/controllers:
+  - URL normalization (`toAbsoluteUrl`)
+  - Login HTML detection (`isLoginHtml`)
+  - Embedded const array extraction (`extractConstArray`)
+  - Redirect-to-login detection (`isRedirectedToLogin`)
+  - Upstream error mapping (`toUpstreamAppError`)
+  - Common cookie header extraction (`getCookieHeader`)
+  - Shared Danella Axios factory (`createDanellaHttpClient`)
+- Use-case signatures standardized to object input for:
+  - `GetTaskDeploymentUseCase`
+  - `GetAvailableCodesUseCase`
+  - `DeleteCodeFromTaskUseCase`
+- Domain types strengthened with conservative known fields while keeping forward-compatible index signatures.
+
+### Verification Runs
+- Typecheck: `pnpm typecheck` -> `pass`
+- Smoke auth flow: `pnpm smoke:auth-flow` -> `login 200`, `validate 200 (SESSION_VALID)`, `logout 200`
+- Smoke tasks list: `pnpm smoke:tasks-local` -> `status 200`, `count 7`
+- Smoke task detail + delete validation: `pnpm smoke:task-detail-local` -> `deployment 200`, `attachments 200`, `delete validation 400 (VALIDATION_ERROR)`
+
+### Notes
+- No wrapper endpoint path/contract changes were introduced in this refactor.
+- Behavior remained consistent after deduplication and shared utility extraction.
+
+Artifact JSON: `none (local compile/smoke validation)`
+
+---

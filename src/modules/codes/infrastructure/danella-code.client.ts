@@ -1,11 +1,18 @@
-import axios, { AxiosError, type AxiosInstance } from "axios";
+import type { AxiosInstance } from "axios";
 
 import { env } from "../../../config/env";
 import { AppError } from "../../../shared/domain/app-error";
+import { createDanellaHttpClient } from "../../../shared/infrastructure/danella-http.client";
+import { extractConstArray, isLoginHtml } from "../../../shared/infrastructure/html.utils";
+import { isRedirectedToLogin } from "../../../shared/infrastructure/response.utils";
+import { toUpstreamAppError } from "../../../shared/infrastructure/upstream-error.utils";
+import { toAbsoluteUrl } from "../../../shared/infrastructure/url.utils";
 import type {
   AddCodeToTaskInput,
   AddCodeToTaskResult,
+  AvailableCode,
   CodeRepository,
+  CodeDetail,
   DeleteCodeFromTaskInput,
   DeleteCodeFromTaskResult,
   GetAvailableCodesInput,
@@ -14,48 +21,11 @@ import type {
   GetCodeDetailResult,
 } from "../domain";
 
-const toAbsoluteUrl = (baseUrl: string, maybeRelativePath: string): string => {
-  if (/^https?:\/\//i.test(maybeRelativePath)) {
-    return maybeRelativePath;
-  }
-
-  return new URL(maybeRelativePath, baseUrl).toString();
-};
-
-const isLoginHtml = (html: string): boolean => {
-  const normalized = html.toLowerCase();
-  return (
-    normalized.includes("__requestverificationtoken") ||
-    normalized.includes("/home/login") ||
-    normalized.includes("name=\"username\"")
-  );
-};
-
-const extractConstArray = (html: string, name: string): Record<string, unknown>[] => {
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`const\\s+${escapedName}\\s*=\\s*(\\[[\\s\\S]*?\\]);`);
-  const match = html.match(regex);
-
-  if (!match?.[1]) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(match[1]) as unknown;
-    return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
-  } catch {
-    throw new AppError(502, "UPSTREAM_PARSE_ERROR", `Could not parse ${name} payload from upstream HTML`);
-  }
-};
-
 export class DanellaCodeClient implements CodeRepository {
   private readonly http: AxiosInstance;
 
-  constructor() {
-    this.http = axios.create({
-      baseURL: env.danella.baseUrl,
-      timeout: env.danella.timeoutMs,
-    });
+  constructor(http?: AxiosInstance) {
+    this.http = http ?? createDanellaHttpClient();
   }
 
   async getAvailableCodes(input: GetAvailableCodesInput): Promise<GetAvailableCodesResult> {
@@ -79,38 +49,20 @@ export class DanellaCodeClient implements CodeRepository {
         );
       }
 
-      const redirectedToLogin =
-        response.status >= 300 &&
-        response.status < 400 &&
-        typeof response.headers.location === "string" &&
-        response.headers.location.toLowerCase().includes("/home/login");
-
-      if (redirectedToLogin || isLoginHtml(response.data)) {
+      if (isRedirectedToLogin(response) || isLoginHtml(response.data)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
 
       return {
         taskId: input.taskId,
-        codes: extractConstArray(response.data, "portfolioList"),
+        codes: extractConstArray<AvailableCode>(response.data, "portfolioList"),
         upstream: {
           status: response.status,
           url,
         },
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error instanceof AxiosError) {
-        throw new AppError(
-          503,
-          "UPSTREAM_UNAVAILABLE",
-          `Could not reach upstream available project codes endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting available codes");
+      throw toUpstreamAppError(error, { endpoint: "upstream available project codes endpoint" });
     }
   }
 
@@ -135,13 +87,7 @@ export class DanellaCodeClient implements CodeRepository {
         );
       }
 
-      const redirectedToLogin =
-        response.status >= 300 &&
-        response.status < 400 &&
-        typeof response.headers.location === "string" &&
-        response.headers.location.toLowerCase().includes("/home/login");
-
-      if (redirectedToLogin) {
+      if (isRedirectedToLogin(response)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
 
@@ -159,26 +105,14 @@ export class DanellaCodeClient implements CodeRepository {
 
       return {
         portfolioId: input.portfolioId,
-        detail: response.data as Record<string, unknown>,
+        detail: response.data as CodeDetail,
         upstream: {
           status: response.status,
           url,
         },
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error instanceof AxiosError) {
-        throw new AppError(
-          503,
-          "UPSTREAM_UNAVAILABLE",
-          `Could not reach upstream project code detail endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting project code detail");
+      throw toUpstreamAppError(error, { endpoint: "upstream project code detail endpoint" });
     }
   }
 
@@ -208,13 +142,7 @@ export class DanellaCodeClient implements CodeRepository {
         throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream add project code endpoint");
       }
 
-      const redirectedToLogin =
-        response.status >= 300 &&
-        response.status < 400 &&
-        typeof response.headers.location === "string" &&
-        response.headers.location.toLowerCase().includes("/home/login");
-
-      if (redirectedToLogin) {
+      if (isRedirectedToLogin(response)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
 
@@ -240,19 +168,7 @@ export class DanellaCodeClient implements CodeRepository {
         },
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error instanceof AxiosError) {
-        throw new AppError(
-          503,
-          "UPSTREAM_UNAVAILABLE",
-          `Could not reach upstream add project code endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while adding project code");
+      throw toUpstreamAppError(error, { endpoint: "upstream add project code endpoint" });
     }
   }
 
@@ -277,6 +193,10 @@ export class DanellaCodeClient implements CodeRepository {
         throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream project code delete endpoint");
       }
 
+      if (isRedirectedToLogin(response)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
       if (typeof response.data === "string" && isLoginHtml(response.data)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
@@ -299,19 +219,7 @@ export class DanellaCodeClient implements CodeRepository {
         },
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error instanceof AxiosError) {
-        throw new AppError(
-          503,
-          "UPSTREAM_UNAVAILABLE",
-          `Could not reach upstream project code delete endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while deleting project code");
+      throw toUpstreamAppError(error, { endpoint: "upstream project code delete endpoint" });
     }
   }
 }

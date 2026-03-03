@@ -1,7 +1,12 @@
-import axios, { AxiosError, type AxiosInstance } from "axios";
+import type { AxiosInstance } from "axios";
 
 import { env } from "../../../config/env";
 import { AppError } from "../../../shared/domain/app-error";
+import { createDanellaHttpClient } from "../../../shared/infrastructure/danella-http.client";
+import { extractConstArray, isLoginHtml } from "../../../shared/infrastructure/html.utils";
+import { isRedirectedToLogin } from "../../../shared/infrastructure/response.utils";
+import { toUpstreamAppError } from "../../../shared/infrastructure/upstream-error.utils";
+import { toAbsoluteUrl } from "../../../shared/infrastructure/url.utils";
 import {
   type GetTaskAttachmentsInput,
   type GetTaskAttachmentsResult,
@@ -9,26 +14,12 @@ import {
   type GetTaskDeploymentResult,
   type ListTasksInput,
   type ListTasksResult,
+  type TaskAssignedProjectCode,
+  type TaskAttachment,
+  type TaskPortfolioCode,
   type TaskRepository,
   type UpstreamTask,
 } from "../domain";
-
-const toAbsoluteUrl = (baseUrl: string, maybeRelativePath: string): string => {
-  if (/^https?:\/\//i.test(maybeRelativePath)) {
-    return maybeRelativePath;
-  }
-
-  return new URL(maybeRelativePath, baseUrl).toString();
-};
-
-const isLoginHtml = (html: string): boolean => {
-  const normalized = html.toLowerCase();
-  return (
-    normalized.includes("__requestverificationtoken") ||
-    normalized.includes("/home/login") ||
-    normalized.includes("name=\"username\"")
-  );
-};
 
 const extractTasksData = (html: string): UpstreamTask[] => {
   const match = html.match(/var\s+tasksData\s*=\s*(\[[\s\S]*?\]);/);
@@ -44,23 +35,6 @@ const extractTasksData = (html: string): UpstreamTask[] => {
     return parsed as UpstreamTask[];
   } catch {
     throw new AppError(502, "UPSTREAM_PARSE_ERROR", "Could not parse tasksData payload from upstream HTML");
-  }
-};
-
-const extractConstArray = (html: string, name: string): Record<string, unknown>[] => {
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`const\\s+${escapedName}\\s*=\\s*(\\[[\\s\\S]*?\\]);`);
-  const match = html.match(regex);
-
-  if (!match?.[1]) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(match[1]) as unknown;
-    return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
-  } catch {
-    throw new AppError(502, "UPSTREAM_PARSE_ERROR", `Could not parse ${name} payload from upstream HTML`);
   }
 };
 
@@ -92,11 +66,8 @@ const applyFilters = (items: UpstreamTask[], status?: string, search?: string): 
 export class DanellaTaskClient implements TaskRepository {
   private readonly http: AxiosInstance;
 
-  constructor() {
-    this.http = axios.create({
-      baseURL: env.danella.baseUrl,
-      timeout: env.danella.timeoutMs,
-    });
+  constructor(http?: AxiosInstance) {
+    this.http = http ?? createDanellaHttpClient();
   }
 
   async listBySubProject(input: ListTasksInput): Promise<ListTasksResult> {
@@ -116,13 +87,7 @@ export class DanellaTaskClient implements TaskRepository {
         throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream tasks endpoint");
       }
 
-      const redirectedToLogin =
-        response.status >= 300 &&
-        response.status < 400 &&
-        typeof response.headers.location === "string" &&
-        response.headers.location.toLowerCase().includes("/home/login");
-
-      if (redirectedToLogin || isLoginHtml(response.data)) {
+      if (isRedirectedToLogin(response) || isLoginHtml(response.data)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
 
@@ -152,19 +117,7 @@ export class DanellaTaskClient implements TaskRepository {
         },
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error instanceof AxiosError) {
-        throw new AppError(
-          503,
-          "UPSTREAM_UNAVAILABLE",
-          `Could not reach upstream tasks endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting upstream tasks");
+      throw toUpstreamAppError(error, { endpoint: "upstream tasks endpoint" });
     }
   }
 
@@ -185,39 +138,21 @@ export class DanellaTaskClient implements TaskRepository {
         throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream deployment endpoint");
       }
 
-      const redirectedToLogin =
-        response.status >= 300 &&
-        response.status < 400 &&
-        typeof response.headers.location === "string" &&
-        response.headers.location.toLowerCase().includes("/home/login");
-
-      if (redirectedToLogin || isLoginHtml(response.data)) {
+      if (isRedirectedToLogin(response) || isLoginHtml(response.data)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
 
       return {
         taskId: input.taskId,
-        portfolioList: extractConstArray(response.data, "portfolioList"),
-        assignedProjectCodes: extractConstArray(response.data, "assigned"),
+        portfolioList: extractConstArray<TaskPortfolioCode>(response.data, "portfolioList"),
+        assignedProjectCodes: extractConstArray<TaskAssignedProjectCode>(response.data, "assigned"),
         upstream: {
           status: response.status,
           url,
         },
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error instanceof AxiosError) {
-        throw new AppError(
-          503,
-          "UPSTREAM_UNAVAILABLE",
-          `Could not reach upstream deployment endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting deployment detail");
+      throw toUpstreamAppError(error, { endpoint: "upstream deployment endpoint" });
     }
   }
 
@@ -238,6 +173,10 @@ export class DanellaTaskClient implements TaskRepository {
         throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream attachments endpoint");
       }
 
+      if (isRedirectedToLogin(response)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
       if (typeof response.data === "string" && isLoginHtml(response.data)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
@@ -248,26 +187,14 @@ export class DanellaTaskClient implements TaskRepository {
 
       return {
         taskId: input.taskId,
-        attachments: response.data as Record<string, unknown>[],
+        attachments: response.data as TaskAttachment[],
         upstream: {
           status: response.status,
           url,
         },
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      if (error instanceof AxiosError) {
-        throw new AppError(
-          503,
-          "UPSTREAM_UNAVAILABLE",
-          `Could not reach upstream attachments endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting task attachments");
+      throw toUpstreamAppError(error, { endpoint: "upstream attachments endpoint" });
     }
   }
 }

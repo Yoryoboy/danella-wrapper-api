@@ -1,8 +1,22 @@
 export interface AvailableCode {
+  portfolioID?: number;
+  code?: string;
+  description?: string;
+  unit?: string;
+  price?: number;
+  quantity?: number;
+  footage?: number;
   [key: string]: unknown;
 }
 
 export interface CodeDetail {
+  portfolioID?: number;
+  code?: string;
+  description?: string;
+  unit?: string;
+  price?: number;
+  quantity?: number;
+  footage?: number;
   [key: string]: unknown;
 }
 

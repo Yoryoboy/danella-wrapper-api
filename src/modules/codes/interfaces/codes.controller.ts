@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 
 import { AppError } from "../../../shared/domain/app-error";
+import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-header";
 import type {
   AddCodeToTaskUseCase,
   DeleteCodeFromTaskUseCase,
@@ -22,20 +23,6 @@ export class CodesController {
     private readonly deleteCodeFromTaskUseCase: DeleteCodeFromTaskUseCase,
   ) {}
 
-  private getCookieHeader(req: Parameters<RequestHandler>[0]): string | null {
-    const customHeader = req.header("x-danella-cookie");
-    if (typeof customHeader === "string" && customHeader.trim().length > 0) {
-      return customHeader.trim();
-    }
-
-    const standardCookieHeader = req.header("cookie");
-    if (typeof standardCookieHeader === "string" && standardCookieHeader.trim().length > 0) {
-      return standardCookieHeader.trim();
-    }
-
-    return null;
-  }
-
   available: RequestHandler = async (req, res, next) => {
     const parsedQuery = taskIdQuerySchema.safeParse(req.query);
     if (!parsedQuery.success) {
@@ -47,14 +34,17 @@ export class CodesController {
       return;
     }
 
-    const cookieHeader = this.getCookieHeader(req);
+    const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
       next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
       return;
     }
 
     try {
-      const result = await this.getAvailableCodesUseCase.execute(parsedQuery.data.taskId, cookieHeader);
+      const result = await this.getAvailableCodesUseCase.execute({
+        taskId: parsedQuery.data.taskId,
+        cookieHeader,
+      });
       res.status(200).json({
         success: true,
         data: result.codes,
@@ -80,7 +70,7 @@ export class CodesController {
       return;
     }
 
-    const cookieHeader = this.getCookieHeader(req);
+    const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
       next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
       return;
@@ -112,7 +102,7 @@ export class CodesController {
       return;
     }
 
-    const cookieHeader = this.getCookieHeader(req);
+    const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
       next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
       return;
@@ -147,17 +137,17 @@ export class CodesController {
       return;
     }
 
-    const cookieHeader = this.getCookieHeader(req);
+    const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
       next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
       return;
     }
 
     try {
-      const result = await this.deleteCodeFromTaskUseCase.execute(
-        parsedQuery.data.taskProjectCodeId,
+      const result = await this.deleteCodeFromTaskUseCase.execute({
+        taskProjectCodeId: parsedQuery.data.taskProjectCodeId,
         cookieHeader,
-      );
+      });
       res.status(result.success ? 200 : 409).json({
         success: result.success,
         message: result.message,

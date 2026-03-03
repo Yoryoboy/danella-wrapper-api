@@ -1,6 +1,7 @@
 import type { RequestHandler } from "express";
 
 import { AppError } from "../../../shared/domain/app-error";
+import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-header";
 import type {
   GetTaskAttachmentsUseCase,
   GetTaskDeploymentUseCase,
@@ -15,20 +16,6 @@ export class TasksController {
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
   ) {}
 
-  private getCookieHeader(req: Parameters<RequestHandler>[0]): string | null {
-    const customHeader = req.header("x-danella-cookie");
-    if (typeof customHeader === "string" && customHeader.trim().length > 0) {
-      return customHeader.trim();
-    }
-
-    const standardCookieHeader = req.header("cookie");
-    if (typeof standardCookieHeader === "string" && standardCookieHeader.trim().length > 0) {
-      return standardCookieHeader.trim();
-    }
-
-    return null;
-  }
-
   list: RequestHandler = async (req, res, next) => {
     const parsedQuery = listTasksQuerySchema.safeParse(req.query);
     if (!parsedQuery.success) {
@@ -40,7 +27,7 @@ export class TasksController {
       return;
     }
 
-    const cookieHeader = this.getCookieHeader(req);
+    const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
       next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
       return;
@@ -92,14 +79,14 @@ export class TasksController {
       return;
     }
 
-    const cookieHeader = this.getCookieHeader(req);
+    const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
       next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
       return;
     }
 
     try {
-      const result = await this.getTaskDeploymentUseCase.execute(taskId, cookieHeader);
+      const result = await this.getTaskDeploymentUseCase.execute({ taskId, cookieHeader });
       res.status(200).json({
         success: true,
         data: {
@@ -135,7 +122,7 @@ export class TasksController {
       return;
     }
 
-    const cookieHeader = this.getCookieHeader(req);
+    const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
       next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
       return;

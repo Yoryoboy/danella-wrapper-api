@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { taskIdQuerySchema } from "../../../shared/interfaces/schemas/common.schemas";
+
 export const listTasksQuerySchema = z
   .object({
     subProjectId: z.coerce.number().int().positive().optional(),
@@ -20,10 +22,7 @@ export const listTasksQuerySchema = z
   });
 
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
-
-export const taskIdQuerySchema = z.object({
-  taskId: z.coerce.number().int().positive(),
-});
+export { taskIdQuerySchema };
 
 export const taskIdParamsSchema = z.object({
   taskId: z.coerce.number().int().positive(),

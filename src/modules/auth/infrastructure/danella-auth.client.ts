@@ -1,8 +1,13 @@
-import axios, { AxiosError, type AxiosInstance } from "axios";
+import { AxiosError, type AxiosInstance } from "axios";
 import { load } from "cheerio";
 
 import { env } from "../../../config/env";
+import { createDanellaHttpClient } from "../../../shared/infrastructure/danella-http.client";
+import { isLoginHtml } from "../../../shared/infrastructure/html.utils";
 import { logger } from "../../../shared/infrastructure/logger";
+import { isRedirectedToLogin } from "../../../shared/infrastructure/response.utils";
+import { toUpstreamAppError } from "../../../shared/infrastructure/upstream-error.utils";
+import { toAbsoluteUrl } from "../../../shared/infrastructure/url.utils";
 import {
   AuthFlowError,
   InvalidCredentialsError,
@@ -42,14 +47,6 @@ const mapToCookieHeader = (cookies: Map<string, string>): string =>
     .map(([name, value]) => `${name}=${value}`)
     .join("; ");
 
-const toAbsoluteUrl = (baseUrl: string, maybeRelativePath: string): string => {
-  if (/^https?:\/\//i.test(maybeRelativePath)) {
-    return maybeRelativePath;
-  }
-
-  return new URL(maybeRelativePath, baseUrl).toString();
-};
-
 const resolveLoginPostPath = (html: string, fallbackPath: string): string => {
   const $ = load(html);
   const action = $("form[action]").first().attr("action");
@@ -62,23 +59,11 @@ const extractAntiForgeryToken = (html: string, tokenField: string): string | nul
   return token?.trim() ?? null;
 };
 
-const isLoginHtml = (html: string): boolean => {
-  const normalized = html.toLowerCase();
-  return (
-    normalized.includes("__requestverificationtoken") ||
-    normalized.includes("/home/login") ||
-    normalized.includes("name=\"username\"")
-  );
-};
-
 export class DanellaAuthClient implements AuthRepository {
   private readonly http: AxiosInstance;
 
-  constructor() {
-    this.http = axios.create({
-      baseURL: env.danella.baseUrl,
-      timeout: env.danella.timeoutMs,
-    });
+  constructor(http?: AxiosInstance) {
+    this.http = http ?? createDanellaHttpClient();
   }
 
   async login(credentials: LoginCredentials): Promise<LoginResult> {
@@ -160,9 +145,8 @@ export class DanellaAuthClient implements AuthRepository {
       }
 
       if (error instanceof AxiosError) {
-        throw new UpstreamUnavailableError(
-          `Could not reach upstream login: ${error.code ?? error.message}`,
-        );
+        const mappedError = toUpstreamAppError(error, { endpoint: "upstream login" });
+        throw new UpstreamUnavailableError(mappedError.message);
       }
 
       throw new UpstreamUnavailableError("Unknown error while connecting to upstream login");
@@ -182,12 +166,7 @@ export class DanellaAuthClient implements AuthRepository {
         throw new UpstreamUnavailableError("Upstream validate endpoint is unavailable");
       }
 
-      const redirectedToLogin =
-        response.status >= 300 &&
-        response.status < 400 &&
-        typeof response.headers.location === "string" &&
-        response.headers.location.toLowerCase().includes("/home/login");
-
+      const redirectedToLogin = isRedirectedToLogin(response);
       const looksLikeLoginHtml = typeof response.data === "string" && isLoginHtml(response.data);
       const valid = !redirectedToLogin && !looksLikeLoginHtml;
 
@@ -204,13 +183,8 @@ export class DanellaAuthClient implements AuthRepository {
         throw error;
       }
 
-      if (error instanceof AxiosError) {
-        throw new UpstreamUnavailableError(
-          `Could not reach upstream validate endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new UpstreamUnavailableError("Unknown error while validating upstream session");
+      const mappedError = toUpstreamAppError(error, { endpoint: "upstream validate endpoint" });
+      throw new UpstreamUnavailableError(mappedError.message);
     }
   }
 
@@ -239,13 +213,8 @@ export class DanellaAuthClient implements AuthRepository {
         throw error;
       }
 
-      if (error instanceof AxiosError) {
-        throw new UpstreamUnavailableError(
-          `Could not reach upstream logout endpoint: ${error.code ?? error.message}`,
-        );
-      }
-
-      throw new UpstreamUnavailableError("Unknown error while calling upstream logout");
+      const mappedError = toUpstreamAppError(error, { endpoint: "upstream logout endpoint" });
+      throw new UpstreamUnavailableError(mappedError.message);
     }
   }
 }

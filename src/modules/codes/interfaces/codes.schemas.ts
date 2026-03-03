@@ -1,12 +1,10 @@
 import { z } from "zod";
 
-export const taskIdQuerySchema = z.object({
-  taskId: z.coerce.number().int().positive(),
-});
-
-export const portfolioIdQuerySchema = z.object({
-  portfolioId: z.coerce.number().int().positive(),
-});
+import {
+  portfolioIdQuerySchema,
+  taskIdQuerySchema,
+} from "../../../shared/interfaces/schemas/common.schemas";
+export { portfolioIdQuerySchema, taskIdQuerySchema };
 
 export const addCodeBodySchema = z.object({
   taskId: z.coerce.number().int().positive(),
