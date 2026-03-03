@@ -53,6 +53,15 @@ Keep deep technical details in `ARCHITECTURE.md`; this file only captures contri
 - Keep error responses consistent with stable machine-readable codes.
 - Version from day one (`/api/v1`) to avoid breaking clients on future changes.
 
+## Query Param Mapping Rule (Wrapper Contract)
+The public wrapper API favors query parameters for task-scoped operations, while Danella-X may require legacy path segments or upstream-specific parameter names.
+
+- Expose wrapper endpoints with stable query params (for example, `taskId`, `taskProjectCodeId`).
+- Translate those query params internally to the exact Danella route format required by upstream.
+- Do not hardcode task IDs or project-code IDs in controllers/services.
+- Keep this translation behavior documented in `README.md` for each affected endpoint.
+- If upstream route shape changes, update both implementation and docs in the same PR.
+
 ## Build, Test, and Development Commands
 - `npm install`: install dependencies.
 - `npm test`: placeholder only (currently prints "No tests configured yet").

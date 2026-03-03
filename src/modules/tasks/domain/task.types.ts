@@ -15,6 +15,14 @@ export interface TaskAttachment {
   [key: string]: unknown;
 }
 
+export interface AvailableProjectCode {
+  [key: string]: unknown;
+}
+
+export interface TaskProjectCodeDetail {
+  [key: string]: unknown;
+}
+
 export interface DeleteTaskProjectCodeInput {
   cookieHeader: string;
   taskProjectCodeId: number;
@@ -52,6 +60,51 @@ export interface GetTaskAttachmentsInput {
 export interface GetTaskAttachmentsResult {
   taskId: number;
   attachments: TaskAttachment[];
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
+export interface GetAvailableTaskProjectCodesInput {
+  cookieHeader: string;
+  taskId: number;
+}
+
+export interface GetAvailableTaskProjectCodesResult {
+  taskId: number;
+  projectCodes: AvailableProjectCode[];
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
+export interface GetTaskProjectCodeDetailInput {
+  cookieHeader: string;
+  portfolioId: number;
+}
+
+export interface GetTaskProjectCodeDetailResult {
+  portfolioId: number;
+  detail: TaskProjectCodeDetail;
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
+export interface AddTaskProjectCodeInput {
+  cookieHeader: string;
+  taskId: number;
+  portfolioId: number;
+  quantity: number;
+  footage: number;
+}
+
+export interface AddTaskProjectCodeResult {
+  success: boolean;
+  message?: string;
   upstream: {
     status: number;
     url: string;

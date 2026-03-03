@@ -1,6 +1,6 @@
 # Endpoint Behavior Notes
 
-Updated: 2026-02-26
+Updated: 2026-03-03
 
 ## `/Home/Login` (GET)
 
@@ -79,3 +79,41 @@ Interpretation:
 Interpretation:
 - Upstream uses `POST` for deletion.
 - Wrapper can expose REST `DELETE` and internally translate to this upstream POST contract.
+
+## `/Task/GetPortfolioByID?portfolioID={id}` (GET)
+
+- Status (authenticated): `200`
+- Content type: `application/json; charset=utf-8`
+- Request parameter: `portfolioID` (query string)
+- Usage observed in UI:
+  - Triggered when selecting an item in "Add Project Codes" modal.
+  - Frontend uses response fields (for example, `unit`) to populate form context.
+
+Interpretation:
+- This is the upstream endpoint for per-code detail lookup.
+- Wrapper can expose `GET /api/v1/tasks/project-codes/detail?portfolioId=...` and map internally.
+
+## `/Task/AddPortfolioToTask` (POST)
+
+- Status observed: `200`
+- Content type: `application/json; charset=utf-8`
+- Request body shape observed:
+  - `{"taskID":"6342","portfolioID":"98","quantity":5,"footage":2}`
+- Frontend success contract observed:
+  - Expects JSON with `success` (boolean) and `message` (string).
+  - On success, UI reloads deployment page.
+
+Interpretation:
+- Upstream creation action is non-REST naming.
+- Wrapper should expose RESTful create endpoint and internally translate field names and route.
+
+## Modal Code Source (`Add Project Codes`)
+
+- No dedicated network call observed when opening the modal to load the initial list.
+- Available codes are embedded in deployment page HTML script as:
+  - `const portfolioList = [...]`
+- Current task assigned codes are embedded as:
+  - `const assigned = [...]`
+
+Interpretation:
+- Wrapper can retrieve available codes by reusing deployment page fetch and parsing `portfolioList`.

@@ -2,15 +2,20 @@ import type { RequestHandler } from "express";
 
 import { AppError } from "../../../shared/domain/app-error";
 import type {
+  AddTaskProjectCodeUseCase,
   DeleteTaskProjectCodeUseCase,
+  GetAvailableTaskProjectCodesUseCase,
   GetTaskAttachmentsUseCase,
   GetTaskDeploymentUseCase,
+  GetTaskProjectCodeDetailUseCase,
   ListTasksUseCase,
 } from "../application";
 import {
+  addTaskProjectCodeBodySchema,
   deleteTaskProjectCodeQuerySchema,
   deleteTaskProjectCodeParamsSchema,
   listTasksQuerySchema,
+  portfolioIdQuerySchema,
   taskIdQuerySchema,
   taskIdParamsSchema,
 } from "./tasks.schemas";
@@ -20,6 +25,9 @@ export class TasksController {
     private readonly listTasksUseCase: ListTasksUseCase,
     private readonly getTaskDeploymentUseCase: GetTaskDeploymentUseCase,
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
+    private readonly getAvailableTaskProjectCodesUseCase: GetAvailableTaskProjectCodesUseCase,
+    private readonly getTaskProjectCodeDetailUseCase: GetTaskProjectCodeDetailUseCase,
+    private readonly addTaskProjectCodeUseCase: AddTaskProjectCodeUseCase,
     private readonly deleteTaskProjectCodeUseCase: DeleteTaskProjectCodeUseCase,
   ) {}
 
@@ -158,6 +166,112 @@ export class TasksController {
           taskId: result.taskId,
           count: result.attachments.length,
         },
+        upstream: result.upstream,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  availableProjectCodes: RequestHandler = async (req, res, next) => {
+    const parsedQuery = taskIdQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", {
+          fields: parsedQuery.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = this.getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    try {
+      const result = await this.getAvailableTaskProjectCodesUseCase.execute(
+        parsedQuery.data.taskId,
+        cookieHeader,
+      );
+      res.status(200).json({
+        success: true,
+        data: result.projectCodes,
+        meta: {
+          taskId: result.taskId,
+          count: result.projectCodes.length,
+        },
+        upstream: result.upstream,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  projectCodeDetail: RequestHandler = async (req, res, next) => {
+    const parsedQuery = portfolioIdQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", {
+          fields: parsedQuery.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = this.getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    try {
+      const result = await this.getTaskProjectCodeDetailUseCase.execute(
+        parsedQuery.data.portfolioId,
+        cookieHeader,
+      );
+      res.status(200).json({
+        success: true,
+        data: result.detail,
+        meta: {
+          portfolioId: result.portfolioId,
+        },
+        upstream: result.upstream,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  addProjectCode: RequestHandler = async (req, res, next) => {
+    const parsedBody = addTaskProjectCodeBodySchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid request body", {
+          fields: parsedBody.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = this.getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    try {
+      const result = await this.addTaskProjectCodeUseCase.execute({
+        cookieHeader,
+        taskId: parsedBody.data.taskId,
+        portfolioId: parsedBody.data.portfolioId,
+        quantity: parsedBody.data.quantity,
+        footage: parsedBody.data.footage,
+      });
+      res.status(result.success ? 200 : 409).json({
+        success: result.success,
+        message: result.message,
         upstream: result.upstream,
       });
     } catch (error) {

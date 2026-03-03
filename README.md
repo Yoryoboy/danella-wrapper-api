@@ -57,6 +57,11 @@ Local server default URL:
 
 Base API prefix: `/api/v1`
 
+Query param contract:
+- Wrapper endpoints prioritize query params (for example, `taskId`, `taskProjectCodeId`) for caller simplicity.
+- Internally, the API maps those params to Danella-X legacy URL shapes (path/query) required by upstream.
+- This mapping is intentional and part of the public contract of this wrapper.
+
 ### Health/Root
 
 - `GET /`
@@ -297,6 +302,105 @@ Base API prefix: `/api/v1`
 }
 ```
 
+- `GET /api/v1/tasks/project-codes/available?taskId=6342`
+- Description: Returns available project codes for a task by extracting `portfolioList` from upstream deployment page HTML.
+- Upstream mapping: `GET /Task/DeploymentProject?TaskID={taskId}` -> parse `const portfolioList = [...]`.
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200`:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "portfolioID": 98,
+      "code": "D1-1",
+      "description": "Test1",
+      "unit": "Un",
+      "price": 24
+    }
+  ],
+  "meta": {
+    "taskId": 6342,
+    "count": 1
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/DeploymentProject?TaskID=6342"
+  }
+}
+```
+
+- `GET /api/v1/tasks/project-codes/detail?portfolioId=98`
+- Description: Returns detail for one portfolio/project code from upstream JSON endpoint.
+- Upstream mapping: `GET /Task/GetPortfolioByID?portfolioID={portfolioId}`.
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "portfolioID": 98,
+    "unit": "Un"
+  },
+  "meta": {
+    "portfolioId": 98
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/GetPortfolioByID?portfolioID=98"
+  }
+}
+```
+
+- `POST /api/v1/tasks/project-codes`
+- Description: Adds a project code to a task.
+- Upstream mapping: `POST /Task/AddPortfolioToTask` with translated JSON payload (`taskID`, `portfolioID`, `quantity`, `footage`).
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Request body:
+
+```json
+{
+  "taskId": 6342,
+  "portfolioId": 98,
+  "quantity": 5,
+  "footage": 2
+}
+```
+
+- Response `200` (successful upstream add):
+
+```json
+{
+  "success": true,
+  "message": "Added successfully",
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/AddPortfolioToTask"
+  }
+}
+```
+
+- Response `409` (upstream responds non-success):
+
+```json
+{
+  "success": false,
+  "message": "Add failed",
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/AddPortfolioToTask"
+  }
+}
+```
+
 - `DELETE /api/v1/tasks/project-codes?taskId=6342&taskProjectCodeId=5158`
 - Description: Deletes a billing/project code relation by mapping to upstream `POST /Task/DeleteTaskProjectCode`.
 - Auth input:
@@ -388,4 +492,7 @@ The auth endpoints are documented in Postman collection:
 - Request: `List Tasks By SubProject`
 - Request: `Get Task Deployment`
 - Request: `Get Task Attachments`
+- Request: `Get Available Task Project Codes`
+- Request: `Get Task Project Code Detail`
+- Request: `Add Task Project Code`
 - Request: `Delete Task Project Code`

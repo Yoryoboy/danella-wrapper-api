@@ -512,6 +512,28 @@ Artifact JSON: `none (local wrapper smoke test)`
 Artifact JSON: `none (captured from browser devtools inspection)`
 
 ---
+## Run 2026-03-03 (Browser Network Inspection - Add Project Code Flow)
+
+### Observed Requests
+- Deployment page: `GET https://danella-x.com/Task/DeploymentProject?TaskID=6342` -> `200`
+- Portfolio detail lookup on modal selection: `GET https://danella-x.com/Task/GetPortfolioByID?portfolioID=98` -> `200`
+- Add project code submit: `POST https://danella-x.com/Task/AddPortfolioToTask` -> `200`
+- Add payload observed: `{"taskID":"6342","portfolioID":"98","quantity":5,"footage":2}`
+- Post-add refresh: `GET https://danella-x.com/Task/DeploymentProject?TaskID=6342` -> `200`
+
+### Embedded Detail Data
+- In `DeploymentProject` HTML scripts:
+  - `const portfolioList = [...]` (available codes in modal)
+  - `const assigned = [...]` (currently assigned task codes)
+
+### Notes
+- No separate endpoint call is required to open the modal list; available codes are preloaded in `portfolioList`.
+- `GetPortfolioByID` is used for detail enrichment when a code is selected.
+- `AddPortfolioToTask` returns JSON consumed by frontend with `success` and `message`.
+
+Artifact JSON: `none (captured from browser devtools inspection)`
+
+---
 ## Run 2026-03-03 (Local Wrapper Smoke - Task Detail Endpoints)
 
 ### Wrapper Flow

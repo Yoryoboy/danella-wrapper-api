@@ -3,12 +3,18 @@ import axios, { AxiosError, type AxiosInstance } from "axios";
 import { env } from "../../../config/env";
 import { AppError } from "../../../shared/domain/app-error";
 import {
+  type AddTaskProjectCodeInput,
+  type AddTaskProjectCodeResult,
   type DeleteTaskProjectCodeInput,
   type DeleteTaskProjectCodeResult,
+  type GetAvailableTaskProjectCodesInput,
+  type GetAvailableTaskProjectCodesResult,
   type GetTaskAttachmentsInput,
   type GetTaskAttachmentsResult,
   type GetTaskDeploymentInput,
   type GetTaskDeploymentResult,
+  type GetTaskProjectCodeDetailInput,
+  type GetTaskProjectCodeDetailResult,
   type ListTasksInput,
   type ListTasksResult,
   type TaskRepository,
@@ -270,6 +276,216 @@ export class DanellaTaskClient implements TaskRepository {
       }
 
       throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting task attachments");
+    }
+  }
+
+  async getAvailableTaskProjectCodes(
+    input: GetAvailableTaskProjectCodesInput,
+  ): Promise<GetAvailableTaskProjectCodesResult> {
+    const url = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/DeploymentProject?TaskID=${encodeURIComponent(String(input.taskId))}`,
+    );
+
+    try {
+      const response = await this.http.get<string>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          "Could not reach upstream available project codes endpoint",
+        );
+      }
+
+      const redirectedToLogin =
+        response.status >= 300 &&
+        response.status < 400 &&
+        typeof response.headers.location === "string" &&
+        response.headers.location.toLowerCase().includes("/home/login");
+
+      if (redirectedToLogin || isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      return {
+        taskId: input.taskId,
+        projectCodes: extractConstArray(response.data, "portfolioList"),
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          `Could not reach upstream available project codes endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new AppError(
+        503,
+        "UPSTREAM_UNAVAILABLE",
+        "Unknown error while requesting available task project codes",
+      );
+    }
+  }
+
+  async getTaskProjectCodeDetail(
+    input: GetTaskProjectCodeDetailInput,
+  ): Promise<GetTaskProjectCodeDetailResult> {
+    const url = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/GetPortfolioByID?portfolioID=${encodeURIComponent(String(input.portfolioId))}`,
+    );
+
+    try {
+      const response = await this.http.get<unknown>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          "Could not reach upstream project code detail endpoint",
+        );
+      }
+
+      const redirectedToLogin =
+        response.status >= 300 &&
+        response.status < 400 &&
+        typeof response.headers.location === "string" &&
+        response.headers.location.toLowerCase().includes("/home/login");
+
+      if (redirectedToLogin) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data === "string" && isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data !== "object" || response.data === null || Array.isArray(response.data)) {
+        throw new AppError(
+          502,
+          "UPSTREAM_PARSE_ERROR",
+          "Unexpected project code detail response format from upstream",
+        );
+      }
+
+      return {
+        portfolioId: input.portfolioId,
+        detail: response.data as Record<string, unknown>,
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          `Could not reach upstream project code detail endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new AppError(
+        503,
+        "UPSTREAM_UNAVAILABLE",
+        "Unknown error while requesting task project code detail",
+      );
+    }
+  }
+
+  async addTaskProjectCode(input: AddTaskProjectCodeInput): Promise<AddTaskProjectCodeResult> {
+    const url = toAbsoluteUrl(env.danella.baseUrl, "/Task/AddPortfolioToTask");
+
+    try {
+      const response = await this.http.post<unknown>(
+        url,
+        {
+          taskID: String(input.taskId),
+          portfolioID: String(input.portfolioId),
+          quantity: input.quantity,
+          footage: input.footage,
+        },
+        {
+          headers: {
+            Cookie: input.cookieHeader,
+            "Content-Type": "application/json",
+          },
+          maxRedirects: 0,
+          validateStatus: () => true,
+        },
+      );
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream add project code endpoint");
+      }
+
+      const redirectedToLogin =
+        response.status >= 300 &&
+        response.status < 400 &&
+        typeof response.headers.location === "string" &&
+        response.headers.location.toLowerCase().includes("/home/login");
+
+      if (redirectedToLogin) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data === "string" && isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      const payload = typeof response.data === "object" && response.data !== null ? response.data : {};
+      const success =
+        typeof (payload as { success?: unknown }).success === "boolean"
+          ? Boolean((payload as { success?: boolean }).success)
+          : response.status >= 200 && response.status < 300;
+
+      return {
+        success,
+        message:
+          typeof (payload as { message?: unknown }).message === "string"
+            ? ((payload as { message?: string }).message ?? undefined)
+            : undefined,
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          `Could not reach upstream add project code endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while adding task project code");
     }
   }
 
