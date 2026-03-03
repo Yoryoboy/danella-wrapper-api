@@ -25,34 +25,9 @@ export const taskIdQuerySchema = z.object({
   taskId: z.coerce.number().int().positive(),
 });
 
-export const portfolioIdQuerySchema = z.object({
-  portfolioId: z.coerce.number().int().positive(),
-});
-
-export const addTaskProjectCodeBodySchema = z.object({
-  taskId: z.coerce.number().int().positive(),
-  portfolioId: z.coerce.number().int().positive(),
-  quantity: z.coerce.number().positive(),
-  footage: z.coerce.number().min(0).default(0),
-});
-
-export const deleteTaskProjectCodeQuerySchema = z.object({
-  taskId: z.coerce.number().int().positive(),
-  taskProjectCodeId: z.coerce.number().int().positive(),
-});
-
 export const taskIdParamsSchema = z.object({
   taskId: z.coerce.number().int().positive(),
 });
 
-export const deleteTaskProjectCodeParamsSchema = z.object({
-  taskId: z.coerce.number().int().positive(),
-  taskProjectCodeId: z.coerce.number().int().positive(),
-});
-
 export type TaskIdParams = z.infer<typeof taskIdParamsSchema>;
-export type DeleteTaskProjectCodeParams = z.infer<typeof deleteTaskProjectCodeParamsSchema>;
 export type TaskIdQuery = z.infer<typeof taskIdQuerySchema>;
-export type PortfolioIdQuery = z.infer<typeof portfolioIdQuerySchema>;
-export type AddTaskProjectCodeBody = z.infer<typeof addTaskProjectCodeBodySchema>;
-export type DeleteTaskProjectCodeQuery = z.infer<typeof deleteTaskProjectCodeQuerySchema>;

@@ -43,7 +43,7 @@ const main = async (): Promise<void> => {
     const attachmentsBody = (await attachmentsResponse.json()) as JsonRecord;
 
     const deleteValidationResponse = await fetch(
-      `${baseUrl}/tasks/project-codes?taskId=${encodeURIComponent(String(taskId))}&taskProjectCodeId=0`,
+      `${baseUrl}/codes?taskId=${encodeURIComponent(String(taskId))}&taskProjectCodeId=0`,
       {
       method: "DELETE",
       headers: { "x-danella-cookie": cookieHeader },

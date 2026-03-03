@@ -1,6 +1,7 @@
 import { Router } from "express";
 
 import { createAuthRouter } from "./auth/interfaces";
+import { createCodesRouter } from "./codes/interfaces";
 import { createTasksRouter } from "./tasks/interfaces";
 
 export const createApiV1Router = (): Router => {
@@ -8,6 +9,7 @@ export const createApiV1Router = (): Router => {
 
   router.use("/auth", createAuthRouter());
   router.use("/tasks", createTasksRouter());
+  router.use("/codes", createCodesRouter());
 
   return router;
 };

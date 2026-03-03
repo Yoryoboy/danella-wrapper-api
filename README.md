@@ -302,7 +302,9 @@ Query param contract:
 }
 ```
 
-- `GET /api/v1/tasks/project-codes/available?taskId=6342`
+### Codes
+
+- `GET /api/v1/codes/available?taskId=6342`
 - Description: Returns available project codes for a task by extracting `portfolioList` from upstream deployment page HTML.
 - Upstream mapping: `GET /Task/DeploymentProject?TaskID={taskId}` -> parse `const portfolioList = [...]`.
 - Auth input:
@@ -333,7 +335,7 @@ Query param contract:
 }
 ```
 
-- `GET /api/v1/tasks/project-codes/detail?portfolioId=98`
+- `GET /api/v1/codes/detail?portfolioId=98`
 - Description: Returns detail for one portfolio/project code from upstream JSON endpoint.
 - Upstream mapping: `GET /Task/GetPortfolioByID?portfolioID={portfolioId}`.
 - Auth input:
@@ -358,7 +360,7 @@ Query param contract:
 }
 ```
 
-- `POST /api/v1/tasks/project-codes`
+- `POST /api/v1/codes`
 - Description: Adds a project code to a task.
 - Upstream mapping: `POST /Task/AddPortfolioToTask` with translated JSON payload (`taskID`, `portfolioID`, `quantity`, `footage`).
 - Auth input:
@@ -401,7 +403,7 @@ Query param contract:
 }
 ```
 
-- `DELETE /api/v1/tasks/project-codes?taskId=6342&taskProjectCodeId=5158`
+- `DELETE /api/v1/codes?taskId=6342&taskProjectCodeId=5158`
 - Description: Deletes a billing/project code relation by mapping to upstream `POST /Task/DeleteTaskProjectCode`.
 - Auth input:
   - `x-danella-cookie: <cookieHeader>` header, or
@@ -439,7 +441,7 @@ Query param contract:
   "success": false,
   "error": {
     "code": "VALIDATION_ERROR",
-    "message": "subProjectId must be provided and x-danella-cookie or Cookie header is required"
+    "message": "taskId/portfolioId/body must be valid and x-danella-cookie or Cookie header is required"
   }
 }
 ```
@@ -463,7 +465,7 @@ Query param contract:
   "success": false,
   "error": {
     "code": "UPSTREAM_PARSE_ERROR",
-    "message": "Could not extract tasksData from upstream HTML"
+    "message": "Could not parse portfolioList payload from upstream HTML"
   }
 }
 ```
@@ -475,23 +477,25 @@ Query param contract:
   "success": false,
   "error": {
     "code": "UPSTREAM_UNAVAILABLE",
-    "message": "Could not reach upstream tasks endpoint"
+    "message": "Could not reach upstream codes endpoint"
   }
 }
 ```
 
 ## Postman
 
-The auth endpoints are documented in Postman collection:
+The endpoints are documented in Postman collection:
 
 - Collection: `danella-wrapper-api`
 - Folder: `Auth`
 - Request: `Login (Cookie Passthrough)`
 - Request: `Validate Session`
 - Request: `Logout`
+- Folder: `Tasks`
 - Request: `List Tasks By SubProject`
 - Request: `Get Task Deployment`
 - Request: `Get Task Attachments`
+- Folder: `Codes`
 - Request: `Get Available Task Project Codes`
 - Request: `Get Task Project Code Detail`
 - Request: `Add Task Project Code`

@@ -18,6 +18,11 @@ src/
       application/
       infrastructure/
       interfaces/
+    codes/
+      domain/
+      application/
+      infrastructure/
+      interfaces/
   shared/
     domain/            # Common errors, value objects
     infrastructure/    # Logger, cache, HTTP utilities

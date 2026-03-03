@@ -1,8 +1,8 @@
 import { AppError } from "../../../shared/domain/app-error";
-import type { TaskRepository } from "../domain/task-repository";
-import type { AddTaskProjectCodeResult } from "../domain/task.types";
+import type { CodeRepository } from "../domain/code-repository";
+import type { AddCodeToTaskResult } from "../domain/code.types";
 
-interface AddTaskProjectCodeInput {
+interface AddCodeToTaskUseCaseInput {
   taskId: number;
   portfolioId: number;
   quantity: number;
@@ -10,10 +10,10 @@ interface AddTaskProjectCodeInput {
   cookieHeader: string;
 }
 
-export class AddTaskProjectCodeUseCase {
-  constructor(private readonly taskRepository: TaskRepository) {}
+export class AddCodeToTaskUseCase {
+  constructor(private readonly codeRepository: CodeRepository) {}
 
-  async execute(input: AddTaskProjectCodeInput): Promise<AddTaskProjectCodeResult> {
+  async execute(input: AddCodeToTaskUseCaseInput): Promise<AddCodeToTaskResult> {
     if (!input.cookieHeader.trim()) {
       throw new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required");
     }
@@ -34,7 +34,7 @@ export class AddTaskProjectCodeUseCase {
       throw new AppError(400, "VALIDATION_ERROR", "footage must be a number >= 0");
     }
 
-    return this.taskRepository.addTaskProjectCode({
+    return this.codeRepository.addCodeToTask({
       cookieHeader: input.cookieHeader,
       taskId: input.taskId,
       portfolioId: input.portfolioId,
