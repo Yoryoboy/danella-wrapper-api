@@ -418,3 +418,76 @@ Artifact JSON: `findings/runs/2026-02-27T14-06-49-015Z-probe.json`
 Artifact JSON: `none (local wrapper smoke test)`
 
 ---
+## Run 2026-03-03 (Local Wrapper Smoke - Auth Validate/Logout)
+
+### Auth Endpoints via Wrapper
+- Local endpoint: `POST http://localhost:3000/api/v1/auth/validate`
+- Status without cookie input: `400`
+- Error code: `VALIDATION_ERROR`
+- Local endpoint: `POST http://localhost:3000/api/v1/auth/logout`
+- Status without cookie input: `400`
+- Error code: `VALIDATION_ERROR`
+
+### Notes
+- Both endpoints are wired and enforce cookie input contract (`auth.cookieHeader` or `x-danella-cookie`).
+- Validation behavior without cookie is deterministic and aligned with API error format.
+
+Artifact JSON: `none (local wrapper smoke test)`
+
+---
+## Run 2026-03-03 (Local Wrapper Smoke - Full Auth Flow)
+
+### Auth Flow via Wrapper
+- Local endpoint: `POST http://localhost:3000/api/v1/auth/login`
+- Status: `200`
+- Upstream login status observed via wrapper: `302`
+- Local endpoint: `POST http://localhost:3000/api/v1/auth/validate`
+- Status: `200`
+- Session result: `valid=true`, `reason=SESSION_VALID`
+- Local endpoint: `POST http://localhost:3000/api/v1/auth/logout`
+- Status: `200`
+- Logout result: `loggedOut=true`
+
+### Notes
+- Full wrapper flow is working end-to-end with current local credentials.
+- Validate and logout endpoints interoperate correctly with cookie passthrough from login response.
+
+Artifact JSON: `none (local wrapper smoke test)`
+
+---
+## Run 2026-03-03 (Browser Network Inspection - Tasks by SubProject)
+
+### Navigation/Task Request Chain
+- Login submit: `POST https://danella-x.com/Home/Login` -> `302`
+- Projects page: `GET https://danella-x.com/Projects/ProgramProjects` -> `200`
+- Task list page: `GET https://danella-x.com/Task/TaskSubProject?SubProjectID=45` -> `200`
+
+### Data Extraction Findings
+- Tasks are embedded in HTML/JS, not returned by a dedicated JSON endpoint.
+- Global JS variable found on page: `tasksData`
+- Observed `tasksData.length`: `7`
+- Sample object fields observed include:
+  - `taskID`, `taskCode`, `jobID`, `subProjectID`, `taskStatusName`, `endCustomerName`, `vendorName`, etc.
+
+### Notes
+- Key query parameter for upstream page: `SubProjectID`.
+- Wrapper endpoint should accept sub-project identifier and parse `tasksData` from HTML.
+
+Artifact JSON: `none (captured from browser devtools inspection)`
+
+---
+## Run 2026-03-03 (Local Wrapper Smoke - Tasks Endpoint)
+
+### Wrapper Flow
+- Login endpoint: `POST /api/v1/auth/login` -> `200`
+- Tasks endpoint: `GET /api/v1/tasks?subProjectId=45&page=1&limit=50` -> `200`
+- Extracted tasks count from wrapper response: `7`
+- First task code in response: `SYS-006342`
+
+### Notes
+- Wrapper tasks endpoint successfully parsed upstream `tasksData` from HTML.
+- Observed count matched browser inspection for `SubProjectID=45`.
+
+Artifact JSON: `none (local wrapper smoke test)`
+
+---

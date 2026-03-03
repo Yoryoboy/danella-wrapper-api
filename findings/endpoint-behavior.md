@@ -34,3 +34,15 @@ Interpretation:
 
 Interpretation:
 - This endpoint is protected and redirects/renders login when unauthenticated.
+
+## `/Task/TaskSubProject?SubProjectID={id}` (GET)
+
+- Status (authenticated): `200`
+- Content type: `text/html; charset=utf-8`
+- Request parameter: `SubProjectID` (query string)
+- Data source on page: JavaScript variable `tasksData` embedded in HTML (`var tasksData = [...]`)
+- Observed sample: `SubProjectID=45`, `tasksData.length=7`
+
+Interpretation:
+- This is the key upstream request used to render the tasks list for a selected sub-project.
+- Task data is not returned as standalone JSON; wrapper must parse `tasksData` from HTML.

@@ -8,8 +8,11 @@ import {
   InvalidCredentialsError,
   UpstreamUnavailableError,
   type AuthRepository,
+  type CookieAuthInput,
   type LoginCredentials,
   type LoginResult,
+  type LogoutResult,
+  type ValidateResult,
 } from "../domain";
 
 const extractCookies = (setCookieHeader: string[] | undefined): Map<string, string> => {
@@ -57,6 +60,15 @@ const extractAntiForgeryToken = (html: string, tokenField: string): string | nul
   const $ = load(html);
   const token = $(`input[name="${tokenField}"]`).first().attr("value");
   return token?.trim() ?? null;
+};
+
+const isLoginHtml = (html: string): boolean => {
+  const normalized = html.toLowerCase();
+  return (
+    normalized.includes("__requestverificationtoken") ||
+    normalized.includes("/home/login") ||
+    normalized.includes("name=\"username\"")
+  );
 };
 
 export class DanellaAuthClient implements AuthRepository {
@@ -154,6 +166,86 @@ export class DanellaAuthClient implements AuthRepository {
       }
 
       throw new UpstreamUnavailableError("Unknown error while connecting to upstream login");
+    }
+  }
+
+  async validate(input: CookieAuthInput): Promise<ValidateResult> {
+    try {
+      const url = toAbsoluteUrl(env.danella.baseUrl, env.danella.validatePath);
+      const response = await this.http.get<string>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new UpstreamUnavailableError("Upstream validate endpoint is unavailable");
+      }
+
+      const redirectedToLogin =
+        response.status >= 300 &&
+        response.status < 400 &&
+        typeof response.headers.location === "string" &&
+        response.headers.location.toLowerCase().includes("/home/login");
+
+      const looksLikeLoginHtml = typeof response.data === "string" && isLoginHtml(response.data);
+      const valid = !redirectedToLogin && !looksLikeLoginHtml;
+
+      return {
+        valid,
+        reason: valid ? "SESSION_VALID" : "SESSION_EXPIRED",
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof UpstreamUnavailableError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new UpstreamUnavailableError(
+          `Could not reach upstream validate endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new UpstreamUnavailableError("Unknown error while validating upstream session");
+    }
+  }
+
+  async logout(input: CookieAuthInput): Promise<LogoutResult> {
+    try {
+      const url = toAbsoluteUrl(env.danella.baseUrl, env.danella.logoutPath);
+      const response = await this.http.get<string>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new UpstreamUnavailableError("Upstream logout endpoint is unavailable");
+      }
+
+      return {
+        loggedOut: true,
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof UpstreamUnavailableError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new UpstreamUnavailableError(
+          `Could not reach upstream logout endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new UpstreamUnavailableError("Unknown error while calling upstream logout");
     }
   }
 }
