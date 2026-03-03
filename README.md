@@ -253,6 +253,81 @@ Base API prefix: `/api/v1`
 }
 ```
 
+- `GET /api/v1/tasks/deployment?taskId=6342`
+- Description: Fetches task deployment detail page (`/Task/DeploymentProject?TaskID={taskId}`) and extracts embedded datasets.
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "taskId": 6342,
+    "portfolioList": [],
+    "assignedProjectCodes": []
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/DeploymentProject?TaskID=6342"
+  }
+}
+```
+
+- `GET /api/v1/tasks/attachments?taskId=6342`
+- Description: Fetches task attachments from upstream JSON endpoint `/Task/GetAttachments?taskID={taskId}`.
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200`:
+
+```json
+{
+  "success": true,
+  "data": [],
+  "meta": {
+    "taskId": 6342,
+    "count": 0
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/GetAttachments?taskID=6342"
+  }
+}
+```
+
+- `DELETE /api/v1/tasks/project-codes?taskId=6342&taskProjectCodeId=5158`
+- Description: Deletes a billing/project code relation by mapping to upstream `POST /Task/DeleteTaskProjectCode`.
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200` (successful upstream delete):
+
+```json
+{
+  "success": true,
+  "message": "Deleted successfully",
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/DeleteTaskProjectCode"
+  }
+}
+```
+
+- Response `409` (upstream responds non-success):
+
+```json
+{
+  "success": false,
+  "message": "Delete failed",
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/DeleteTaskProjectCode"
+  }
+}
+```
+
 - Response `400`:
 
 ```json
@@ -311,3 +386,6 @@ The auth endpoints are documented in Postman collection:
 - Request: `Validate Session`
 - Request: `Logout`
 - Request: `List Tasks By SubProject`
+- Request: `Get Task Deployment`
+- Request: `Get Task Attachments`
+- Request: `Delete Task Project Code`

@@ -20,3 +20,26 @@ export const listTasksQuerySchema = z
   });
 
 export type ListTasksQuery = z.infer<typeof listTasksQuerySchema>;
+
+export const taskIdQuerySchema = z.object({
+  taskId: z.coerce.number().int().positive(),
+});
+
+export const deleteTaskProjectCodeQuerySchema = z.object({
+  taskId: z.coerce.number().int().positive(),
+  taskProjectCodeId: z.coerce.number().int().positive(),
+});
+
+export const taskIdParamsSchema = z.object({
+  taskId: z.coerce.number().int().positive(),
+});
+
+export const deleteTaskProjectCodeParamsSchema = z.object({
+  taskId: z.coerce.number().int().positive(),
+  taskProjectCodeId: z.coerce.number().int().positive(),
+});
+
+export type TaskIdParams = z.infer<typeof taskIdParamsSchema>;
+export type DeleteTaskProjectCodeParams = z.infer<typeof deleteTaskProjectCodeParamsSchema>;
+export type TaskIdQuery = z.infer<typeof taskIdQuerySchema>;
+export type DeleteTaskProjectCodeQuery = z.infer<typeof deleteTaskProjectCodeQuerySchema>;

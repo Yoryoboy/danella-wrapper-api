@@ -12,6 +12,7 @@
     "smoke:auth-endpoints": "tsx scripts/smoke-auth-endpoints.ts",
     "smoke:auth-local": "tsx scripts/smoke-auth-local.ts",
     "smoke:tasks-local": "tsx scripts/smoke-tasks-local.ts",
+    "smoke:task-detail-local": "tsx scripts/smoke-task-detail-local.ts",
     "probe:auth-task": "tsx scripts/probe-auth-task.ts",
     "test": "echo \"No tests configured yet\""
   },

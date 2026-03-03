@@ -491,3 +491,43 @@ Artifact JSON: `none (captured from browser devtools inspection)`
 Artifact JSON: `none (local wrapper smoke test)`
 
 ---
+## Run 2026-03-03 (Browser Network Inspection - Task Detail and Billing Code Delete)
+
+### Observed Requests
+- Detail page open: `GET https://danella-x.com/Task/DeploymentProject?TaskID=6342` -> `200`
+- Attachments load: `GET https://danella-x.com/Task/GetAttachments?taskID=6342` -> `200`
+- Billing code delete action: `POST https://danella-x.com/Task/DeleteTaskProjectCode` -> `200`
+- Delete payload observed: `{"taskProjectCodeID":5158}`
+- Post-delete refresh: `GET https://danella-x.com/Task/DeploymentProject?TaskID=6342` -> `200`
+
+### Embedded Detail Data
+- In `DeploymentProject` HTML scripts:
+  - `const portfolioList = [...]`
+  - `const assigned = [...]`
+
+### Notes
+- Upstream deletion is non-REST (`POST`), wrapper should map to RESTful `DELETE`.
+- Attachments endpoint is direct JSON and lower parsing risk than HTML-based endpoints.
+
+Artifact JSON: `none (captured from browser devtools inspection)`
+
+---
+## Run 2026-03-03 (Local Wrapper Smoke - Task Detail Endpoints)
+
+### Wrapper Flow
+- Login endpoint: `POST /api/v1/auth/login` -> `200`
+- Deployment endpoint: `GET /api/v1/tasks/6342/deployment` -> `200`
+- Attachments endpoint: `GET /api/v1/tasks/6342/attachments` -> `200`
+- Safe validation of delete route params:
+  - `DELETE /api/v1/tasks/6342/project-codes/0` -> `400`, code `VALIDATION_ERROR`
+
+### Notes
+- Deployment parsing returned:
+  - `portfolioList.length = 4`
+  - `assignedProjectCodes.length = 2`
+- Attachments endpoint returned JSON array shape (count observed: `0` in this run).
+- Destructive delete action was intentionally not executed in smoke test.
+
+Artifact JSON: `none (local wrapper smoke test)`
+
+---

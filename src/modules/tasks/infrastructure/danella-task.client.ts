@@ -2,7 +2,18 @@ import axios, { AxiosError, type AxiosInstance } from "axios";
 
 import { env } from "../../../config/env";
 import { AppError } from "../../../shared/domain/app-error";
-import { type TaskRepository, type ListTasksInput, type ListTasksResult, type UpstreamTask } from "../domain";
+import {
+  type DeleteTaskProjectCodeInput,
+  type DeleteTaskProjectCodeResult,
+  type GetTaskAttachmentsInput,
+  type GetTaskAttachmentsResult,
+  type GetTaskDeploymentInput,
+  type GetTaskDeploymentResult,
+  type ListTasksInput,
+  type ListTasksResult,
+  type TaskRepository,
+  type UpstreamTask,
+} from "../domain";
 
 const toAbsoluteUrl = (baseUrl: string, maybeRelativePath: string): string => {
   if (/^https?:\/\//i.test(maybeRelativePath)) {
@@ -35,6 +46,23 @@ const extractTasksData = (html: string): UpstreamTask[] => {
     return parsed as UpstreamTask[];
   } catch {
     throw new AppError(502, "UPSTREAM_PARSE_ERROR", "Could not parse tasksData payload from upstream HTML");
+  }
+};
+
+const extractConstArray = (html: string, name: string): Record<string, unknown>[] => {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`const\\s+${escapedName}\\s*=\\s*(\\[[\\s\\S]*?\\]);`);
+  const match = html.match(regex);
+
+  if (!match?.[1]) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(match[1]) as unknown;
+    return Array.isArray(parsed) ? (parsed as Record<string, unknown>[]) : [];
+  } catch {
+    throw new AppError(502, "UPSTREAM_PARSE_ERROR", `Could not parse ${name} payload from upstream HTML`);
   }
 };
 
@@ -139,6 +167,168 @@ export class DanellaTaskClient implements TaskRepository {
       }
 
       throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting upstream tasks");
+    }
+  }
+
+  async getDeployment(input: GetTaskDeploymentInput): Promise<GetTaskDeploymentResult> {
+    const url = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/DeploymentProject?TaskID=${encodeURIComponent(String(input.taskId))}`,
+    );
+
+    try {
+      const response = await this.http.get<string>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream deployment endpoint");
+      }
+
+      const redirectedToLogin =
+        response.status >= 300 &&
+        response.status < 400 &&
+        typeof response.headers.location === "string" &&
+        response.headers.location.toLowerCase().includes("/home/login");
+
+      if (redirectedToLogin || isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      return {
+        taskId: input.taskId,
+        portfolioList: extractConstArray(response.data, "portfolioList"),
+        assignedProjectCodes: extractConstArray(response.data, "assigned"),
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          `Could not reach upstream deployment endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting deployment detail");
+    }
+  }
+
+  async getAttachments(input: GetTaskAttachmentsInput): Promise<GetTaskAttachmentsResult> {
+    const url = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/GetAttachments?taskID=${encodeURIComponent(String(input.taskId))}`,
+    );
+
+    try {
+      const response = await this.http.get<unknown>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream attachments endpoint");
+      }
+
+      if (typeof response.data === "string" && isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (!Array.isArray(response.data)) {
+        throw new AppError(502, "UPSTREAM_PARSE_ERROR", "Unexpected attachments response format from upstream");
+      }
+
+      return {
+        taskId: input.taskId,
+        attachments: response.data as Record<string, unknown>[],
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          `Could not reach upstream attachments endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while requesting task attachments");
+    }
+  }
+
+  async deleteTaskProjectCode(input: DeleteTaskProjectCodeInput): Promise<DeleteTaskProjectCodeResult> {
+    const url = toAbsoluteUrl(env.danella.baseUrl, "/Task/DeleteTaskProjectCode");
+
+    try {
+      const response = await this.http.post<unknown>(
+        url,
+        { taskProjectCodeID: input.taskProjectCodeId },
+        {
+          headers: {
+            Cookie: input.cookieHeader,
+            "Content-Type": "application/json",
+          },
+          maxRedirects: 0,
+          validateStatus: () => true,
+        },
+      );
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream project code delete endpoint");
+      }
+
+      if (typeof response.data === "string" && isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      const payload = typeof response.data === "object" && response.data !== null ? response.data : {};
+      const success =
+        typeof (payload as { success?: unknown }).success === "boolean"
+          ? Boolean((payload as { success?: boolean }).success)
+          : response.status >= 200 && response.status < 300;
+
+      return {
+        success,
+        message:
+          typeof (payload as { message?: unknown }).message === "string"
+            ? ((payload as { message?: string }).message ?? undefined)
+            : undefined,
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      if (error instanceof AxiosError) {
+        throw new AppError(
+          503,
+          "UPSTREAM_UNAVAILABLE",
+          `Could not reach upstream project code delete endpoint: ${error.code ?? error.message}`,
+        );
+      }
+
+      throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Unknown error while deleting task project code");
     }
   }
 }

@@ -11,6 +11,53 @@ export interface UpstreamTask {
   [key: string]: unknown;
 }
 
+export interface TaskAttachment {
+  [key: string]: unknown;
+}
+
+export interface DeleteTaskProjectCodeInput {
+  cookieHeader: string;
+  taskProjectCodeId: number;
+}
+
+export interface DeleteTaskProjectCodeResult {
+  success: boolean;
+  message?: string;
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
+export interface GetTaskDeploymentInput {
+  cookieHeader: string;
+  taskId: number;
+}
+
+export interface GetTaskDeploymentResult {
+  taskId: number;
+  portfolioList: Record<string, unknown>[];
+  assignedProjectCodes: Record<string, unknown>[];
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
+export interface GetTaskAttachmentsInput {
+  cookieHeader: string;
+  taskId: number;
+}
+
+export interface GetTaskAttachmentsResult {
+  taskId: number;
+  attachments: TaskAttachment[];
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
 export interface ListTasksResult {
   items: UpstreamTask[];
   pagination: {

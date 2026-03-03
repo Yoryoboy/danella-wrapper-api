@@ -1,16 +1,37 @@
 import { Router } from "express";
-import { ListTasksUseCase } from "../application";
+import {
+  DeleteTaskProjectCodeUseCase,
+  GetTaskAttachmentsUseCase,
+  GetTaskDeploymentUseCase,
+  ListTasksUseCase,
+} from "../application";
 import { DanellaTaskClient } from "../infrastructure";
 import { TasksController } from "./tasks.controller";
 
 export const createTasksRouter = (): Router => {
   const taskRepository = new DanellaTaskClient();
   const listTasksUseCase = new ListTasksUseCase(taskRepository);
-  const tasksController = new TasksController(listTasksUseCase);
+  const getTaskDeploymentUseCase = new GetTaskDeploymentUseCase(taskRepository);
+  const getTaskAttachmentsUseCase = new GetTaskAttachmentsUseCase(taskRepository);
+  const deleteTaskProjectCodeUseCase = new DeleteTaskProjectCodeUseCase(taskRepository);
+  const tasksController = new TasksController(
+    listTasksUseCase,
+    getTaskDeploymentUseCase,
+    getTaskAttachmentsUseCase,
+    deleteTaskProjectCodeUseCase,
+  );
 
   const router = Router();
 
   router.get("/", tasksController.list);
+  router.get("/deployment", tasksController.deployment);
+  router.get("/attachments", tasksController.attachments);
+  router.delete("/project-codes", tasksController.deleteProjectCode);
+
+  // Backward-compatible routes (path params) kept temporarily.
+  router.get("/:taskId/deployment", tasksController.deployment);
+  router.get("/:taskId/attachments", tasksController.attachments);
+  router.delete("/:taskId/project-codes/:taskProjectCodeId", tasksController.deleteProjectCode);
 
   return router;
 };
