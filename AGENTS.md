@@ -101,7 +101,23 @@ Each new endpoint must be documented in Postman before a PR is considered comple
 - Minimum per endpoint: method, URL/path, params/body schema, auth requirements, example request, and example response.
 - Keep Postman docs synchronized with code changes in the same PR.
 
+## Endpoint Documentation Rule
+Every new endpoint created from now on must be documented immediately in repository docs.
+
+- Update the root `README.md` in the same change where the endpoint is added.
+- Document: method, path, purpose, request schema, success response, and known error responses.
+- If endpoint behavior changes, update existing README endpoint docs in the same PR.
+
+## Reverse Engineering Findings Rule
+This project depends on iterative reverse engineering of Danella-X behavior. Findings are part of the project deliverable and must be kept in-repo.
+
+- Always document relevant discoveries in `findings/` as soon as they are confirmed.
+- Update `findings/discovery-log.md` with run context and observed behavior deltas.
+- Update `findings/endpoint-behavior.md` and/or `findings/authentication-design.md` when behavior assumptions or contracts change.
+- Persist structured run artifacts in `findings/runs/` when they add value for traceability.
+- Do not postpone documentation to the end of the task; findings should evolve with implementation.
+
 ## Security & Configuration Tips
 - Never commit real credentials in `.env`.
-- Do not commit personal test/probe files; keep them local and ignored.
+- Findings produced from reverse engineering are expected in this repository; never include secrets inside those artifacts.
 - Redact tokens/passwords in logs and examples.

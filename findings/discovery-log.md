@@ -403,3 +403,18 @@ Artifact JSON: `findings/runs/2026-02-27T14-05-52-680Z-probe.json`
 Artifact JSON: `findings/runs/2026-02-27T14-06-49-015Z-probe.json`
 
 ---
+## Run 2026-03-03 (Local Wrapper Smoke)
+
+### Auth Flow via Wrapper
+- Local endpoint: `POST http://localhost:3000/api/v1/auth/login`
+- Wrapper status: `401`
+- Wrapper error code: `INVALID_CREDENTIALS`
+
+### Notes
+- Local server boot confirmed with API prefix `/api/v1`.
+- Wrapper contract is working (returns standardized JSON error shape on auth failure).
+- Upstream credentials currently available in local `.env` did not produce authenticated login in this run.
+
+Artifact JSON: `none (local wrapper smoke test)`
+
+---

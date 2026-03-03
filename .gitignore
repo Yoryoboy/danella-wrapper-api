@@ -1,3 +1,5 @@
 node_modules/
 .env
-findings/runs/*.json
+dist/
+.env.example
+findings/runs
