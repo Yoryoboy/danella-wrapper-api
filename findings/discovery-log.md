@@ -649,3 +649,15 @@ Artifact JSON: `none (local wrapper smoke + in-process script)`
 Artifact file: `findings/runs/2026-03-04-task-subproject-sanitized.html`
 
 ---
+## Run 2026-03-04T00:00:00.000Z
+
+### Auth Flow
+- Logout endpoint probe: `https://danella-x.com/Home/Logout` -> `404`
+- Wrapper `logout` contract behavior (before fix): `loggedOut: true` for `404`
+- Wrapper `logout` contract behavior (after fix): `loggedOut: false` unless upstream redirects to `/Home/Login` or returns login HTML
+
+### Notes
+- Logout success is now determined using the same upstream session-end signals as `validate`: login redirect and login HTML detection.
+- A non-terminal response (for example `404`) no longer reports a false-positive logout.
+
+Artifact JSON: `n/a (cleanup/behavior fix)`
