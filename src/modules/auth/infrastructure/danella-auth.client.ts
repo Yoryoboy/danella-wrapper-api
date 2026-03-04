@@ -201,8 +201,12 @@ export class DanellaAuthClient implements AuthRepository {
         throw new UpstreamUnavailableError("Upstream logout endpoint is unavailable");
       }
 
+      const redirectedToLogin = isRedirectedToLogin(response);
+      const looksLikeLoginHtml = typeof response.data === "string" && isLoginHtml(response.data);
+      const loggedOut = redirectedToLogin || looksLikeLoginHtml;
+
       return {
-        loggedOut: true,
+        loggedOut,
         upstream: {
           status: response.status,
           url,
