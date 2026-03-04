@@ -39,15 +39,13 @@ This file tracks minor cleanup items intentionally deferred after the critical/h
   - Single source of truth for API version prefixing.
   - Health response/version docs remain accurate.
 
-## 5. Lockfile Policy
+## 5. Lockfile Policy ✅ DONE
 
-- Standardize package manager choice (`pnpm` vs `npm`).
-- Keep only one lockfile:
-  - `pnpm-lock.yaml` if pnpm is canonical, or
-  - `package-lock.json` if npm is canonical.
+- ✅ Removed `package-lock.json` (npm lockfile)
+- ✅ Keeping `pnpm-lock.yaml` as canonical
 - Acceptance criteria:
-  - One lockfile in repo.
-  - README/setup commands align with chosen package manager.
+  - ✅ One lockfile in repo.
+  - ✅ README/setup commands align with pnpm as package manager.
 
 ## 6. `.env.example` Script Variables
 
