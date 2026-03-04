@@ -22,14 +22,13 @@ This file tracks minor cleanup items intentionally deferred after the critical/h
   - No unused inferred type exports remain.
   - Type exports that remain are actively consumed.
 
-## 3. `express-rate-limit` Dependency Decision
+## 3. `express-rate-limit` Dependency Decision ✅ DONE
 
-- Either:
-  - Implement rate-limiting middleware in app bootstrap, or
-  - Remove `express-rate-limit` from [package.json](package.json).
+- ✅ Removed `express-rate-limit` from [package.json](package.json)
+- ✅ Can be re-added when needed in the future
 - Acceptance criteria:
-  - No unused runtime dependency.
-  - If implemented, behavior documented in README.
+  - ✅ No unused runtime dependency.
+  - ✅ If implemented in future, behavior will be documented in README.
 
 ## 4. API Prefix / Version Source of Truth
 
