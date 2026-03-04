@@ -3,12 +3,15 @@ import type { RequestHandler } from "express";
 import { AppError } from "../../../shared/domain/app-error";
 import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-header";
 import type {
+  CreateTaskUseCase,
   GetTaskAttachmentsUseCase,
   GetTaskDeploymentUseCase,
   GetTaskFormMetadataUseCase,
   ListTasksUseCase,
 } from "../application";
 import {
+  createTaskBodySchema,
+  createTaskQuerySchema,
   listTasksQuerySchema,
   taskFormMetadataQuerySchema,
   taskIdParamsSchema,
@@ -18,6 +21,7 @@ import {
 export class TasksController {
   constructor(
     private readonly listTasksUseCase: ListTasksUseCase,
+    private readonly createTaskUseCase: CreateTaskUseCase,
     private readonly getTaskDeploymentUseCase: GetTaskDeploymentUseCase,
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
     private readonly getTaskFormMetadataUseCase: GetTaskFormMetadataUseCase,
@@ -58,6 +62,56 @@ export class TasksController {
         data: result.items,
         pagination: result.pagination,
         filters: result.filters,
+        upstream: result.upstream,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  create: RequestHandler = async (req, res, next) => {
+    const parsedQuery = createTaskQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", {
+          fields: parsedQuery.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const parsedBody = createTaskBodySchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid request body", {
+          fields: parsedBody.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    try {
+      const result = await this.createTaskUseCase.execute({
+        cookieHeader,
+        subProjectId: parsedQuery.data.subProjectId,
+        jobId: parsedBody.data.jobId,
+        verifierKeyId: parsedBody.data.verifierKeyId,
+        endCustomerId: parsedBody.data.endCustomerId,
+        managerAreaId: parsedBody.data.managerAreaId,
+      });
+
+      res.status(result.success ? 200 : 409).json({
+        success: result.success,
+        message:
+          result.message ??
+          (result.success ? "Created successfully" : "Upstream task creation did not succeed"),
+        data: result.data,
         upstream: result.upstream,
       });
     } catch (error) {

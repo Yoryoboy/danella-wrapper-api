@@ -12,6 +12,15 @@ export interface GetTaskFormMetadataInput {
   subProjectId: number;
 }
 
+export interface CreateTaskInput {
+  cookieHeader: string;
+  subProjectId: number;
+  jobId: string;
+  verifierKeyId: string;
+  endCustomerId: number;
+  managerAreaId: number;
+}
+
 export interface UpstreamTask {
   taskID?: number;
   taskCode?: string;
@@ -129,5 +138,21 @@ export interface GetTaskFormMetadataResult {
     url: string;
     jobTypesStatus: number;
     jobTypesUrl: string;
+  };
+}
+
+export interface CreateTaskResult {
+  success: boolean;
+  message?: string;
+  data: {
+    subProjectId: number;
+    jobId: string;
+    verifierKeyId: string;
+    endCustomerId: number;
+    managerAreaId: number;
+  };
+  upstream: {
+    status: number;
+    url: string;
   };
 }

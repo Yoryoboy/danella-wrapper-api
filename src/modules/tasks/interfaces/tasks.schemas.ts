@@ -43,6 +43,19 @@ export const taskFormMetadataQuerySchema = z
     }
   });
 
+export const createTaskQuerySchema = z.object({
+  subProjectId: z.coerce.number().int().positive(),
+});
+
+export const createTaskBodySchema = z.object({
+  jobId: z.string().trim().min(1),
+  verifierKeyId: z.string().trim().min(1),
+  endCustomerId: z.coerce.number().int().positive(),
+  managerAreaId: z.coerce.number().int().positive(),
+});
+
 export type TaskIdParams = z.infer<typeof taskIdParamsSchema>;
 export type TaskIdQuery = z.infer<typeof taskIdQuerySchema>;
 export type TaskFormMetadataQuery = z.infer<typeof taskFormMetadataQuerySchema>;
+export type CreateTaskQuery = z.infer<typeof createTaskQuerySchema>;
+export type CreateTaskBody = z.infer<typeof createTaskBodySchema>;

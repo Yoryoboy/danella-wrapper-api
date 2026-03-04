@@ -64,6 +64,11 @@ Interpretation:
 Interpretation:
 - Upstream creation action is non-REST naming.
 - Wrapper should expose REST `POST /api/v1/tasks` and internally map body names and IDs to this contract.
+- Wrapper implementation notes (2026-03-04):
+  - Public query param: `subProjectId`.
+  - Public body fields: `jobId`, `verifierKeyId`, `endCustomerId`, `managerAreaId`.
+  - Wrapper enforces `jobTypeID` from metadata (`jobTypeDefault.id`) and does not allow client override.
+  - Wrapper validates `endCustomerId` and `managerAreaId` against `TaskSubProject` dictionaries before forwarding.
 
 ## `/Task/GetJobTypesByProjectType?projectTypeID={id}` (GET)
 

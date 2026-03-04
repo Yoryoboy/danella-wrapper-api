@@ -323,6 +323,121 @@ Query param contract:
 }
 ```
 
+- `POST /api/v1/tasks?subProjectId=45`
+- Description: Creates a task in Danella by combining client-provided IDs with authoritative form metadata from the same sub-project.
+- Upstream mapping:
+  - Metadata source: `GET /Task/TaskSubProject?SubProjectID={subProjectId}`
+  - Creation action: `POST /Task/InsertTask`
+  - Wrapper translates body/query fields to upstream payload keys (`jobID`, `endCustomerID`, `managerAreaID`, `customerID`, `projectID`, `subProjectID`, `projectTypeID`, `verifierKeyID`, `jobTypeID`).
+- Query params:
+  - `subProjectId` (required, integer)
+- Request body:
+
+```json
+{
+  "jobId": "Job Test",
+  "verifierKeyId": "000",
+  "endCustomerId": 5,
+  "managerAreaId": 5
+}
+```
+
+- Validation rules:
+  - `jobId` required non-empty string
+  - `verifierKeyId` required non-empty string
+  - `endCustomerId` required positive integer and must exist in sub-project `endCustomers` metadata
+  - `managerAreaId` required positive integer and must exist in sub-project `managerAreas` metadata
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200` (upstream business success):
+
+```json
+{
+  "success": true,
+  "message": "Created successfully",
+  "data": {
+    "subProjectId": 45,
+    "jobId": "Job Test",
+    "verifierKeyId": "000",
+    "endCustomerId": 5,
+    "managerAreaId": 5
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/InsertTask"
+  }
+}
+```
+
+- Response `409` (upstream business non-success):
+
+```json
+{
+  "success": false,
+  "message": "Task already exists",
+  "data": {
+    "subProjectId": 45,
+    "jobId": "Job Test",
+    "verifierKeyId": "000",
+    "endCustomerId": 5,
+    "managerAreaId": 5
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/InsertTask"
+  }
+}
+```
+
+- Response `400`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid request body"
+  }
+}
+```
+
+- Response `401`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "SESSION_EXPIRED",
+    "message": "Danella session is expired or invalid"
+  }
+}
+```
+
+- Response `502`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UPSTREAM_PARSE_ERROR",
+    "message": "Unexpected task creation response format from upstream"
+  }
+}
+```
+
+- Response `503`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UPSTREAM_UNAVAILABLE",
+    "message": "Could not reach upstream task creation endpoint"
+  }
+}
+```
+
 - `GET /api/v1/tasks`
 - Description: Returns task list for a Danella sub-project by scraping `TaskSubProject` HTML and extracting `tasksData`.
 - Query params:

@@ -661,3 +661,33 @@ Artifact file: `findings/runs/2026-03-04-task-subproject-sanitized.html`
 - A non-terminal response (for example `404`) no longer reports a false-positive logout.
 
 Artifact JSON: `n/a (cleanup/behavior fix)`
+
+---
+## Run 2026-03-04 (Local Wrapper Implementation - Task Create Endpoint)
+
+### Wrapper Flow
+- Typecheck: `pnpm typecheck` -> `pass`
+- New route wired: `POST /api/v1/tasks?subProjectId={id}`
+- Wrapper validation added for required fields:
+  - `jobId`
+  - `verifierKeyId`
+  - `endCustomerId`
+  - `managerAreaId`
+- Wrapper preflight metadata lookup:
+  - `GET /Task/TaskSubProject?SubProjectID={id}`
+  - `GET /Task/GetJobTypesByProjectType?projectTypeID={id}`
+- Upstream create mapping used:
+  - `POST /Task/InsertTask`
+  - Payload keys: `jobID`, `endCustomerID`, `managerAreaID`, `customerID`, `projectID`, `subProjectID`, `projectTypeID`, `verifierKeyID`, `jobTypeID`
+- Local in-process smoke checks:
+  - Missing `verifierKeyId` -> `400 VALIDATION_ERROR` (`Invalid request body`)
+  - Missing cookie header -> `400 VALIDATION_ERROR`
+  - Fake cookie header -> `401 SESSION_EXPIRED`
+  - Valid login cookie + invalid catalog IDs -> `400 VALIDATION_ERROR` (`endCustomerId is not valid for this sub-project`)
+
+### Notes
+- `jobTypeID` is enforced from upstream metadata default (`jobTypeDefault.id`) and is not client-overridable.
+- `endCustomerId` and `managerAreaId` are validated against the metadata catalogs before calling `InsertTask`.
+- Wrapper now returns `409` when upstream responds with business non-success (`success: false`) while preserving upstream status/url metadata.
+
+Artifact JSON: `none (local implementation + typecheck)`

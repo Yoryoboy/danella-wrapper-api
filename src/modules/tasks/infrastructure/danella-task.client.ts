@@ -9,6 +9,8 @@ import { isRedirectedToLogin } from "../../../shared/infrastructure/response.uti
 import { toUpstreamAppError } from "../../../shared/infrastructure/upstream-error.utils";
 import { toAbsoluteUrl } from "../../../shared/infrastructure/url.utils";
 import {
+  type CreateTaskInput,
+  type CreateTaskResult,
   type GetTaskAttachmentsInput,
   type GetTaskAttachmentsResult,
   type GetTaskDeploymentInput,
@@ -134,6 +136,9 @@ const extractSelectDictionary = ($: cheerio.CheerioAPI, selector: string): TaskM
 
   return entries;
 };
+
+const hasDictionaryEntry = (entries: TaskMetadataDictionaryItem[], id: number): boolean =>
+  entries.some((entry) => entry.id === id);
 
 export class DanellaTaskClient implements TaskRepository {
   private readonly http: AxiosInstance;
@@ -299,6 +304,99 @@ export class DanellaTaskClient implements TaskRepository {
       };
     } catch (error) {
       throw toUpstreamAppError(error, { endpoint: "upstream task form metadata endpoint" });
+    }
+  }
+
+  async createTask(input: CreateTaskInput): Promise<CreateTaskResult> {
+    const url = toAbsoluteUrl(env.danella.baseUrl, "/Task/InsertTask");
+
+    try {
+      const metadata = await this.getTaskFormMetadata({
+        cookieHeader: input.cookieHeader,
+        subProjectId: input.subProjectId,
+      });
+
+      if (!hasDictionaryEntry(metadata.endCustomers, input.endCustomerId)) {
+        throw new AppError(400, "VALIDATION_ERROR", "endCustomerId is not valid for this sub-project", {
+          subProjectId: input.subProjectId,
+          endCustomerId: input.endCustomerId,
+        });
+      }
+
+      if (!hasDictionaryEntry(metadata.managerAreas, input.managerAreaId)) {
+        throw new AppError(400, "VALIDATION_ERROR", "managerAreaId is not valid for this sub-project", {
+          subProjectId: input.subProjectId,
+          managerAreaId: input.managerAreaId,
+        });
+      }
+
+      const response = await this.http.post<unknown>(
+        url,
+        {
+          jobID: input.jobId,
+          endCustomerID: String(input.endCustomerId),
+          managerAreaID: String(input.managerAreaId),
+          customerID: String(metadata.customer.id),
+          projectID: String(metadata.project.id),
+          subProjectID: String(metadata.subProject.id),
+          projectTypeID: String(metadata.projectType.id),
+          verifierKeyID: input.verifierKeyId,
+          jobTypeID: String(metadata.jobTypeDefault.id),
+        },
+        {
+          headers: {
+            Cookie: input.cookieHeader,
+            "Content-Type": "application/json",
+          },
+          maxRedirects: 0,
+          validateStatus: () => true,
+        },
+      );
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream task creation endpoint");
+      }
+
+      if (isRedirectedToLogin(response)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data === "string" && isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data !== "object" || response.data === null || Array.isArray(response.data)) {
+        throw new AppError(502, "UPSTREAM_PARSE_ERROR", "Unexpected task creation response format from upstream");
+      }
+
+      const payload = response.data as { success?: unknown; message?: unknown };
+      const success =
+        typeof payload.success === "boolean"
+          ? payload.success
+          : response.status >= 200 && response.status < 300;
+
+      return {
+        success,
+        message:
+          typeof payload.message === "string"
+            ? payload.message
+            : success
+              ? "Created successfully"
+              : "Upstream task creation did not succeed",
+        data: {
+          subProjectId: input.subProjectId,
+          jobId: input.jobId,
+          verifierKeyId: input.verifierKeyId,
+          endCustomerId: input.endCustomerId,
+          managerAreaId: input.managerAreaId,
+        },
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      throw toUpstreamAppError(error, { endpoint: "upstream task creation endpoint" });
     }
   }
 
