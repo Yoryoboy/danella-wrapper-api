@@ -5,15 +5,22 @@ import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-head
 import type {
   GetTaskAttachmentsUseCase,
   GetTaskDeploymentUseCase,
+  GetTaskFormMetadataUseCase,
   ListTasksUseCase,
 } from "../application";
-import { listTasksQuerySchema, taskIdParamsSchema, taskIdQuerySchema } from "./tasks.schemas";
+import {
+  listTasksQuerySchema,
+  taskFormMetadataQuerySchema,
+  taskIdParamsSchema,
+  taskIdQuerySchema,
+} from "./tasks.schemas";
 
 export class TasksController {
   constructor(
     private readonly listTasksUseCase: ListTasksUseCase,
     private readonly getTaskDeploymentUseCase: GetTaskDeploymentUseCase,
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
+    private readonly getTaskFormMetadataUseCase: GetTaskFormMetadataUseCase,
   ) {}
 
   list: RequestHandler = async (req, res, next) => {
@@ -136,6 +143,83 @@ export class TasksController {
         meta: {
           taskId: result.taskId,
           count: result.attachments.length,
+        },
+        upstream: result.upstream,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  formMetadata: RequestHandler = async (req, res, next) => {
+    const parsedQuery = taskFormMetadataQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", {
+          fields: parsedQuery.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    const subProjectId = parsedQuery.data.subProjectId ?? parsedQuery.data.projectId;
+
+    try {
+      const result = await this.getTaskFormMetadataUseCase.execute({
+        cookieHeader,
+        subProjectId: Number(subProjectId),
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          customer: {
+            id: result.customer.id,
+            name: result.customer.name,
+          },
+          project: {
+            id: result.project.id,
+            name: result.project.name,
+          },
+          subProject: {
+            id: result.subProject.id,
+            name: result.subProject.name,
+          },
+          projectType: {
+            id: result.projectType.id,
+            name: result.projectType.name,
+          },
+          jobTypeDefault: {
+            id: result.jobTypeDefault.id,
+            name: result.jobTypeDefault.name,
+          },
+          endCustomers: result.endCustomers.map((item) => ({
+            id: item.id,
+            name: item.name,
+          })),
+          managerAreas: result.managerAreas.map((item) => ({
+            id: item.id,
+            name: item.name,
+          })),
+          jobTypesByProjectType: result.jobTypesByProjectType.map((item) => ({
+            id: item.id,
+            name: item.name,
+            projectTypeId: item.projectTypeId,
+          })),
+        },
+        meta: {
+          subProjectId: result.subProject.id,
+          counts: {
+            endCustomers: result.endCustomers.length,
+            managerAreas: result.managerAreas.length,
+            jobTypesByProjectType: result.jobTypesByProjectType.length,
+          },
         },
         upstream: result.upstream,
       });

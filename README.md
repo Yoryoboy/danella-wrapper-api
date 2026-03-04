@@ -214,6 +214,115 @@ Query param contract:
 
 ### Tasks
 
+- `GET /api/v1/tasks/form-metadata?subProjectId=45`
+- Description: Returns metadata needed to build the upstream Add Task form for a sub-project. Parses context dictionaries from `TaskSubProject` HTML and enriches job types from `/Task/GetJobTypesByProjectType`.
+- Query params:
+  - `subProjectId` (required, integer)
+  - `projectId` (optional alias for `subProjectId`)
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "customer": {
+      "id": 10,
+      "name": "A-NxWs"
+    },
+    "project": {
+      "id": 25,
+      "name": "NxWs - High Split"
+    },
+    "subProject": {
+      "id": 45,
+      "name": "NxWs - HS - Asbuilt"
+    },
+    "projectType": {
+      "id": 2,
+      "name": "High Split"
+    },
+    "jobTypeDefault": {
+      "id": 2,
+      "name": "Asbuilt"
+    },
+    "endCustomers": [
+      { "id": 1, "name": "Comcast" }
+    ],
+    "managerAreas": [
+      { "id": 5, "name": "Jorge Diaz" }
+    ],
+    "jobTypesByProjectType": [
+      { "id": 2, "name": "Asbuilt", "projectTypeId": 2 }
+    ]
+  },
+  "meta": {
+    "subProjectId": 45,
+    "counts": {
+      "endCustomers": 4,
+      "managerAreas": 36,
+      "jobTypesByProjectType": 6
+    }
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/TaskSubProject?SubProjectID=45",
+    "jobTypesStatus": 200,
+    "jobTypesUrl": "https://danella-x.com/Task/GetJobTypesByProjectType?projectTypeID=2"
+  }
+}
+```
+
+- Response `400`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid query parameters"
+  }
+}
+```
+
+- Response `401`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "SESSION_EXPIRED",
+    "message": "Danella session is expired or invalid"
+  }
+}
+```
+
+- Response `502`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UPSTREAM_PARSE_ERROR",
+    "message": "Could not extract task form labels from upstream HTML"
+  }
+}
+```
+
+- Response `503`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UPSTREAM_UNAVAILABLE",
+    "message": "Could not reach upstream task form metadata endpoint"
+  }
+}
+```
+
 - `GET /api/v1/tasks`
 - Description: Returns task list for a Danella sub-project by scraping `TaskSubProject` HTML and extracting `tasksData`.
 - Query params:
@@ -492,6 +601,7 @@ The endpoints are documented in Postman collection:
 - Request: `Validate Session`
 - Request: `Logout`
 - Folder: `Tasks`
+- Request: `Get Task Form Metadata`
 - Request: `List Tasks By SubProject`
 - Request: `Get Task Deployment`
 - Request: `Get Task Attachments`

@@ -1,4 +1,5 @@
 import type { AxiosInstance } from "axios";
+import * as cheerio from "cheerio";
 
 import { env } from "../../../config/env";
 import { AppError } from "../../../shared/domain/app-error";
@@ -12,10 +13,14 @@ import {
   type GetTaskAttachmentsResult,
   type GetTaskDeploymentInput,
   type GetTaskDeploymentResult,
+  type GetTaskFormMetadataInput,
+  type GetTaskFormMetadataResult,
   type ListTasksInput,
   type ListTasksResult,
   type TaskAssignedProjectCode,
   type TaskAttachment,
+  type TaskMetadataDictionaryItem,
+  type TaskMetadataJobTypeDictionaryItem,
   type TaskPortfolioCode,
   type TaskRepository,
   type UpstreamTask,
@@ -61,6 +66,73 @@ const applyFilters = (items: UpstreamTask[], status?: string, search?: string): 
 
     return statusOk && searchOk;
   });
+};
+
+type UpstreamJobType = {
+  jobTypeID?: number;
+  projectTypeID?: number;
+  jobType?: string;
+  [key: string]: unknown;
+};
+
+const toPositiveInt = (value: unknown): number | null => {
+  const parsed = Number(String(value ?? "").trim());
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const toDictionaryItem = (id: number, name: string): TaskMetadataDictionaryItem => ({
+  id,
+  name,
+  code: null,
+});
+
+const normalizeLabelText = (value: string): string => value.replace(/\s+/g, " ").trim();
+
+const extractLabelValue = ($: cheerio.CheerioAPI, labelPrefix: string): string | null => {
+  const normalizedPrefix = `${labelPrefix.toLowerCase()}:`;
+
+  for (const node of $("#addTaskForm label").toArray()) {
+    const rawText = normalizeLabelText($(node).text());
+    if (!rawText.toLowerCase().startsWith(normalizedPrefix)) {
+      continue;
+    }
+
+    const value = rawText.slice(rawText.indexOf(":") + 1).trim();
+    return value || null;
+  }
+
+  return null;
+};
+
+const extractHiddenId = ($: cheerio.CheerioAPI, selector: string, field: string): number => {
+  const rawValue = $(selector).attr("value") ?? $(selector).val();
+  const parsed = toPositiveInt(rawValue);
+
+  if (!parsed) {
+    throw new AppError(502, "UPSTREAM_PARSE_ERROR", `Could not extract ${field} from upstream HTML`);
+  }
+
+  return parsed;
+};
+
+const extractSelectDictionary = ($: cheerio.CheerioAPI, selector: string): TaskMetadataDictionaryItem[] => {
+  const entries: TaskMetadataDictionaryItem[] = [];
+
+  $(selector)
+    .find("option")
+    .each((_idx, option) => {
+      const rawId = $(option).attr("value");
+      const id = toPositiveInt(rawId);
+      const name = normalizeLabelText($(option).text());
+
+      if (!id || !name) {
+        return;
+      }
+
+      entries.push(toDictionaryItem(id, name));
+    });
+
+  return entries;
 };
 
 export class DanellaTaskClient implements TaskRepository {
@@ -118,6 +190,115 @@ export class DanellaTaskClient implements TaskRepository {
       };
     } catch (error) {
       throw toUpstreamAppError(error, { endpoint: "upstream tasks endpoint" });
+    }
+  }
+
+  async getTaskFormMetadata(input: GetTaskFormMetadataInput): Promise<GetTaskFormMetadataResult> {
+    const url = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/TaskSubProject?SubProjectID=${encodeURIComponent(String(input.subProjectId))}`,
+    );
+
+    try {
+      const response = await this.http.get<string>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream task form metadata endpoint");
+      }
+
+      if (isRedirectedToLogin(response) || isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      const $ = cheerio.load(response.data);
+      const customerId = extractHiddenId($, "#customerID", "customerID");
+      const projectId = extractHiddenId($, "#projectID", "projectID");
+      const subProjectId = extractHiddenId($, "#subProjectID", "subProjectID");
+      const projectTypeId = extractHiddenId($, "#newProjectTypeID", "projectTypeID");
+      const jobTypeDefaultId = extractHiddenId($, "#newJobTypeID", "jobTypeID");
+
+      const customerName = extractLabelValue($, "Customer");
+      const projectName = extractLabelValue($, "Project");
+      const subProjectName = extractLabelValue($, "SubProject");
+      const projectTypeName = extractLabelValue($, "Project Type");
+      const jobTypeDefaultName = extractLabelValue($, "Job Type");
+
+      if (!customerName || !projectName || !subProjectName || !projectTypeName || !jobTypeDefaultName) {
+        throw new AppError(502, "UPSTREAM_PARSE_ERROR", "Could not extract task form labels from upstream HTML");
+      }
+
+      const endCustomers = extractSelectDictionary($, "#newEndCustomerID");
+      const managerAreas = extractSelectDictionary($, "#newManagerAreaID");
+
+      const jobTypesUrl = toAbsoluteUrl(
+        env.danella.baseUrl,
+        `/Task/GetJobTypesByProjectType?projectTypeID=${encodeURIComponent(String(projectTypeId))}`,
+      );
+      const jobTypesResponse = await this.http.get<unknown>(jobTypesUrl, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (jobTypesResponse.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream job types endpoint");
+      }
+
+      if (isRedirectedToLogin(jobTypesResponse)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof jobTypesResponse.data === "string" && isLoginHtml(jobTypesResponse.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (!Array.isArray(jobTypesResponse.data)) {
+        throw new AppError(502, "UPSTREAM_PARSE_ERROR", "Unexpected job types response format from upstream");
+      }
+
+      const jobTypesByProjectType = (jobTypesResponse.data as UpstreamJobType[]).reduce<
+        TaskMetadataJobTypeDictionaryItem[]
+      >((acc, item) => {
+        const id = toPositiveInt(item.jobTypeID);
+        const name = normalizeLabelText(String(item.jobType ?? ""));
+        const itemProjectTypeId = toPositiveInt(item.projectTypeID) ?? projectTypeId;
+
+        if (!id || !name) {
+          return acc;
+        }
+
+        acc.push({
+          id,
+          name,
+          code: null,
+          projectTypeId: itemProjectTypeId,
+        });
+
+        return acc;
+      }, []);
+
+      return {
+        subProject: toDictionaryItem(subProjectId, subProjectName),
+        project: toDictionaryItem(projectId, projectName),
+        customer: toDictionaryItem(customerId, customerName),
+        projectType: toDictionaryItem(projectTypeId, projectTypeName),
+        jobTypeDefault: toDictionaryItem(jobTypeDefaultId, jobTypeDefaultName),
+        endCustomers,
+        managerAreas,
+        jobTypesByProjectType,
+        upstream: {
+          status: response.status,
+          url,
+          jobTypesStatus: jobTypesResponse.status,
+          jobTypesUrl,
+        },
+      };
+    } catch (error) {
+      throw toUpstreamAppError(error, { endpoint: "upstream task form metadata endpoint" });
     }
   }
 

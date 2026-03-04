@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   GetTaskAttachmentsUseCase,
   GetTaskDeploymentUseCase,
+  GetTaskFormMetadataUseCase,
   ListTasksUseCase,
 } from "../application";
 import { DanellaTaskClient } from "../infrastructure";
@@ -12,15 +13,18 @@ export const createTasksRouter = (): Router => {
   const listTasksUseCase = new ListTasksUseCase(taskRepository);
   const getTaskDeploymentUseCase = new GetTaskDeploymentUseCase(taskRepository);
   const getTaskAttachmentsUseCase = new GetTaskAttachmentsUseCase(taskRepository);
+  const getTaskFormMetadataUseCase = new GetTaskFormMetadataUseCase(taskRepository);
   const tasksController = new TasksController(
     listTasksUseCase,
     getTaskDeploymentUseCase,
     getTaskAttachmentsUseCase,
+    getTaskFormMetadataUseCase,
   );
 
   const router = Router();
 
   router.get("/", tasksController.list);
+  router.get("/form-metadata", tasksController.formMetadata);
   router.get("/deployment", tasksController.deployment);
   router.get("/attachments", tasksController.attachments);
 

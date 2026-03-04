@@ -7,6 +7,11 @@ export interface ListTasksInput {
   search?: string;
 }
 
+export interface GetTaskFormMetadataInput {
+  cookieHeader: string;
+  subProjectId: number;
+}
+
 export interface UpstreamTask {
   taskID?: number;
   taskCode?: string;
@@ -97,5 +102,32 @@ export interface ListTasksResult {
   upstream: {
     status: number;
     url: string;
+  };
+}
+
+export interface TaskMetadataDictionaryItem {
+  id: number;
+  name: string;
+  code: string | null;
+}
+
+export interface TaskMetadataJobTypeDictionaryItem extends TaskMetadataDictionaryItem {
+  projectTypeId: number;
+}
+
+export interface GetTaskFormMetadataResult {
+  subProject: TaskMetadataDictionaryItem;
+  project: TaskMetadataDictionaryItem;
+  customer: TaskMetadataDictionaryItem;
+  projectType: TaskMetadataDictionaryItem;
+  jobTypeDefault: TaskMetadataDictionaryItem;
+  endCustomers: TaskMetadataDictionaryItem[];
+  managerAreas: TaskMetadataDictionaryItem[];
+  jobTypesByProjectType: TaskMetadataJobTypeDictionaryItem[];
+  upstream: {
+    status: number;
+    url: string;
+    jobTypesStatus: number;
+    jobTypesUrl: string;
   };
 }

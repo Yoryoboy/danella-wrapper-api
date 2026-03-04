@@ -28,5 +28,21 @@ export const taskIdParamsSchema = z.object({
   taskId: z.coerce.number().int().positive(),
 });
 
+export const taskFormMetadataQuerySchema = z
+  .object({
+    subProjectId: z.coerce.number().int().positive().optional(),
+    projectId: z.coerce.number().int().positive().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (!value.subProjectId && !value.projectId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "subProjectId is required (projectId is accepted as alias)",
+        path: ["subProjectId"],
+      });
+    }
+  });
+
 export type TaskIdParams = z.infer<typeof taskIdParamsSchema>;
 export type TaskIdQuery = z.infer<typeof taskIdQuerySchema>;
+export type TaskFormMetadataQuery = z.infer<typeof taskFormMetadataQuerySchema>;

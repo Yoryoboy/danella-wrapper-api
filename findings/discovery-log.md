@@ -583,3 +583,55 @@ Artifact JSON: `none (local wrapper smoke test)`
 Artifact JSON: `none (local compile/smoke validation)`
 
 ---
+## Run 2026-03-04 (Browser Inspection - Add Task Form Metadata)
+
+### Observed Upstream Behavior
+- Task page load: `GET https://danella-x.com/Task/TaskSubProject?SubProjectID=45` -> `200`
+- Add Task save action: `POST https://danella-x.com/Task/InsertTask` -> `200`
+- Save payload observed:
+  - `{"jobID":"jobtest","endCustomerID":"5","managerAreaID":"5","customerID":"10","projectID":"25","subProjectID":"45","projectTypeID":"2","verifierKeyID":"000","jobTypeID":"2"}`
+- Job types lookup endpoint observed in page script:
+  - `GET https://danella-x.com/Task/GetJobTypesByProjectType?projectTypeID=2` -> `200`
+
+### Add Task Metadata Extraction Findings
+- No separate request is fired when opening Add Task modal for end-customer/manager catalogs.
+- The metadata is embedded in `TaskSubProject` HTML:
+  - Hidden IDs: `customerID=10`, `projectID=25`, `subProjectID=45`, `projectTypeID=2`, `jobTypeID=2`
+  - End-customer options count: `4`
+  - Manager area options count: `36`
+- Observed label mapping in modal:
+  - `Customer: A-NxWs`
+  - `Project: NxWs - High Split`
+  - `SubProject: NxWs - HS - Asbuilt`
+  - `Project Type: High Split`
+  - `Job Type: Asbuilt`
+
+### Notes
+- `TaskSubProject` is both task-list source (`tasksData`) and Add Task form metadata source.
+- `GetJobTypesByProjectType` can be used to enrich `jobTypeID` dictionary data beyond the default hidden value.
+
+Artifact JSON: `none (captured from browser devtools inspection)`
+
+---
+## Run 2026-03-04 (Local Wrapper Implementation - Task Form Metadata Endpoint)
+
+### Wrapper Flow
+- Typecheck: `pnpm typecheck` -> `pass`
+- Existing tasks smoke: `pnpm smoke:tasks-local` -> `status 200`, `count 8`
+- New endpoint smoke (local script with in-process app server):
+  - Login: `POST /api/v1/auth/login` -> `200`
+  - Form metadata: `GET /api/v1/tasks/form-metadata?subProjectId=45` -> `200`
+  - Parsed counts observed:
+    - `endCustomers=4`
+    - `managerAreas=36`
+    - `jobTypesByProjectType=6`
+
+### Notes
+- New endpoint contract returns dictionary objects (`id`, `name`, `code`) for customer/project/subproject and selectable catalogs.
+- Upstream mapping used:
+  - `GET /Task/TaskSubProject?SubProjectID={id}`
+  - `GET /Task/GetJobTypesByProjectType?projectTypeID={id}`
+
+Artifact JSON: `none (local wrapper smoke + in-process script)`
+
+---
