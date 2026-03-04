@@ -39,12 +39,27 @@ export const env = {
   danella: {
     baseUrl: toNonEmpty(process.env.DANELLA_BASE_URL, "https://danella-x.com"),
     timeoutMs: toNumber(process.env.DANELLA_TIMEOUT_MS, 30000),
-    loginPagePath: toNonEmpty(process.env.DANELLA_LOGIN_PAGE_PATH, "/Home/Login"),
+    loginPagePath: toNonEmpty(
+      process.env.DANELLA_LOGIN_PAGE_PATH,
+      "/Home/Login",
+    ),
     loginPostPath: process.env.DANELLA_LOGIN_POST_PATH?.trim() ?? "",
-    loginUsernameField: toNonEmpty(process.env.DANELLA_LOGIN_USERNAME_FIELD, "Username"),
-    loginPasswordField: toNonEmpty(process.env.DANELLA_LOGIN_PASSWORD_FIELD, "Password"),
-    tokenField: toNonEmpty(process.env.DANELLA_TOKEN_FIELD, "__RequestVerificationToken"),
-    validatePath: toNonEmpty(process.env.DANELLA_VALIDATE_PATH, "/Task/MyTasks"),
-    logoutPath: toNonEmpty(process.env.DANELLA_LOGOUT_PATH, "/Home/Logout"),
+    loginUsernameField: toNonEmpty(
+      process.env.DANELLA_LOGIN_USERNAME_FIELD,
+      "Username",
+    ),
+    loginPasswordField: toNonEmpty(
+      process.env.DANELLA_LOGIN_PASSWORD_FIELD,
+      "Password",
+    ),
+    tokenField: toNonEmpty(
+      process.env.DANELLA_TOKEN_FIELD,
+      "__RequestVerificationToken",
+    ),
+    validatePath: toNonEmpty(
+      process.env.DANELLA_VALIDATE_PATH,
+      "/Task/MyTasks",
+    ),
+    logoutPath: toNonEmpty(process.env.DANELLA_LOGOUT_PATH, "/Home/Salir"),
   },
 } as const;
