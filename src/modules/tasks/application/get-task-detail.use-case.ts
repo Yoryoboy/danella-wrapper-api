@@ -1,11 +1,11 @@
 import { AppError } from "../../../shared/domain/app-error";
 import type { TaskRepository } from "../domain/task-repository";
-import type { GetTaskDeploymentInput, GetTaskDeploymentResult } from "../domain/task.types";
+import type { GetTaskDetailInput, GetTaskDetailResult } from "../domain/task.types";
 
-export class GetTaskDeploymentUseCase {
+export class GetTaskDetailUseCase {
   constructor(private readonly taskRepository: TaskRepository) {}
 
-  async execute(input: GetTaskDeploymentInput): Promise<GetTaskDeploymentResult> {
+  async execute(input: GetTaskDetailInput): Promise<GetTaskDetailResult> {
     if (!input.cookieHeader.trim()) {
       throw new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required");
     }
@@ -14,6 +14,6 @@ export class GetTaskDeploymentUseCase {
       throw new AppError(400, "VALIDATION_ERROR", "taskId must be a positive integer");
     }
 
-    return this.taskRepository.getDeployment(input);
+    return this.taskRepository.getTaskDetail(input);
   }
 }

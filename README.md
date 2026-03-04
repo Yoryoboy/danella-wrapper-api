@@ -482,8 +482,8 @@ Query param contract:
 }
 ```
 
-- `GET /api/v1/tasks/deployment?taskId=6342`
-- Description: Fetches task deployment detail page (`/Task/DeploymentProject?TaskID={taskId}`) and extracts embedded datasets.
+- `GET /api/v1/tasks/6342`
+- Description: Fetches complete task detail by task ID from upstream deployment context (`/Task/DeploymentProject?TaskID={taskId}`), attachments, and messages.
 - Auth input:
   - `x-danella-cookie: <cookieHeader>` header, or
   - standard `Cookie` header
@@ -494,12 +494,61 @@ Query param contract:
   "success": true,
   "data": {
     "taskId": 6342,
-    "portfolioList": [],
-    "assignedProjectCodes": []
+    "primaryDetails": {
+      "taskCode": "SYS-006342",
+      "creationDate": "04/03/26",
+      "jobId": "TEST-001 (Asbuilt) /TEST-001 (Design)",
+      "jobLinks": [
+        {
+          "label": "TEST-001 (Asbuilt)",
+          "taskId": 6342,
+          "href": "/Task/DeploymentProject?TaskID=6342"
+        }
+      ],
+      "startDate": "01/03/26",
+      "customerBu": null,
+      "estimatedClosingDate": null,
+      "endCustomer": "Charter",
+      "endDate": null,
+      "legalEntity": "BL Technology Inc.",
+      "managerArea": "Jorge Diaz",
+      "forecastRevenueAmount": "$0,00",
+      "forecastCostAmount": "$0,00",
+      "projectType": "High Split",
+      "jobType": "Asbuilt",
+      "extra": {}
+    },
+    "secondaryFields": [],
+    "assignmentControl": {
+      "headers": [
+        "Resource",
+        "Position/Title",
+        "04-Mar"
+      ],
+      "inHouseRows": [],
+      "vendorSummary": "3pv | Supplier",
+      "vendorAssignments": []
+    },
+    "projectCodes": {
+      "available": [],
+      "assigned": []
+    },
+    "attachments": [],
+    "messages": []
   },
   "upstream": {
-    "status": 200,
-    "url": "https://danella-x.com/Task/DeploymentProject?TaskID=6342"
+    "deployment": {
+      "status": 200,
+      "url": "https://danella-x.com/Task/DeploymentProject?TaskID=6342"
+    },
+    "attachments": {
+      "status": 200,
+      "url": "https://danella-x.com/Task/GetAttachments?taskID=6342"
+    },
+    "messages": {
+      "status": 200,
+      "url": "https://danella-x.com/Task/GetMessagesByTaskID?taskID=6342"
+    }
   }
 }
 ```
@@ -718,7 +767,7 @@ The endpoints are documented in Postman collection:
 - Folder: `Tasks`
 - Request: `Get Task Form Metadata`
 - Request: `List Tasks By SubProject`
-- Request: `Get Task Deployment`
+- Request: `Get Task`
 - Request: `Get Task Attachments`
 - Folder: `Codes`
 - Request: `Get Available Task Project Codes`

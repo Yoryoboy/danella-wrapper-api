@@ -3,8 +3,8 @@ import type {
   CreateTaskResult,
   GetTaskAttachmentsInput,
   GetTaskAttachmentsResult,
-  GetTaskDeploymentInput,
-  GetTaskDeploymentResult,
+  GetTaskDetailInput,
+  GetTaskDetailResult,
   GetTaskFormMetadataInput,
   GetTaskFormMetadataResult,
   ListTasksInput,
@@ -13,7 +13,7 @@ import type {
 
 export interface TaskRepository {
   listBySubProject(input: ListTasksInput): Promise<ListTasksResult>;
-  getDeployment(input: GetTaskDeploymentInput): Promise<GetTaskDeploymentResult>;
+  getTaskDetail(input: GetTaskDetailInput): Promise<GetTaskDetailResult>;
   getAttachments(input: GetTaskAttachmentsInput): Promise<GetTaskAttachmentsResult>;
   getTaskFormMetadata(input: GetTaskFormMetadataInput): Promise<GetTaskFormMetadataResult>;
   createTask(input: CreateTaskInput): Promise<CreateTaskResult>;

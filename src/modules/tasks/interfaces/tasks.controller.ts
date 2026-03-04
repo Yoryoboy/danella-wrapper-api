@@ -5,7 +5,7 @@ import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-head
 import type {
   CreateTaskUseCase,
   GetTaskAttachmentsUseCase,
-  GetTaskDeploymentUseCase,
+  GetTaskDetailUseCase,
   GetTaskFormMetadataUseCase,
   ListTasksUseCase,
 } from "../application";
@@ -22,7 +22,7 @@ export class TasksController {
   constructor(
     private readonly listTasksUseCase: ListTasksUseCase,
     private readonly createTaskUseCase: CreateTaskUseCase,
-    private readonly getTaskDeploymentUseCase: GetTaskDeploymentUseCase,
+    private readonly getTaskDetailUseCase: GetTaskDetailUseCase,
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
     private readonly getTaskFormMetadataUseCase: GetTaskFormMetadataUseCase,
   ) {}
@@ -119,26 +119,18 @@ export class TasksController {
     }
   };
 
-  deployment: RequestHandler = async (req, res, next) => {
-    const parsedFromQuery = taskIdQuerySchema.safeParse(req.query);
-    const parsedFromParams = taskIdParamsSchema.safeParse(req.params);
-    const taskId = parsedFromQuery.success
-      ? parsedFromQuery.data.taskId
-      : parsedFromParams.success
-        ? parsedFromParams.data.taskId
-        : null;
-
-    if (!taskId) {
+  getById: RequestHandler = async (req, res, next) => {
+    const parsedParams = taskIdParamsSchema.safeParse(req.params);
+    if (!parsedParams.success) {
       next(
         new AppError(400, "VALIDATION_ERROR", "Invalid route parameters", {
-          fields: {
-            query: parsedFromQuery.success ? undefined : parsedFromQuery.error.flatten(),
-            params: parsedFromParams.success ? undefined : parsedFromParams.error.flatten(),
-          },
+          fields: parsedParams.error.flatten(),
         }),
       );
       return;
     }
+
+    const { taskId } = parsedParams.data;
 
     const cookieHeader = getCookieHeader(req);
     if (!cookieHeader) {
@@ -147,13 +139,17 @@ export class TasksController {
     }
 
     try {
-      const result = await this.getTaskDeploymentUseCase.execute({ taskId, cookieHeader });
+      const result = await this.getTaskDetailUseCase.execute({ taskId, cookieHeader });
       res.status(200).json({
         success: true,
         data: {
           taskId: result.taskId,
-          portfolioList: result.portfolioList,
-          assignedProjectCodes: result.assignedProjectCodes,
+          primaryDetails: result.primaryDetails,
+          secondaryFields: result.secondaryFields,
+          assignmentControl: result.assignmentControl,
+          projectCodes: result.projectCodes,
+          attachments: result.attachments,
+          messages: result.messages,
         },
         upstream: result.upstream,
       });

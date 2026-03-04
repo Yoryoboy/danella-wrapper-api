@@ -93,10 +93,14 @@ Interpretation:
 - Embedded page datasets observed:
   - `const portfolioList = [...]`
   - `const assigned = [...]` (task project/billing codes currently assigned)
+- Structured HTML sections observed:
+  - Primary task fields table (`#tablaTaskDetail`)
+  - Secondary fields table (`#tablaSecondaryFields`)
+  - Assignment control matrix (`#tablaAssignment`) and vendor cards
 
 Interpretation:
 - This is the key upstream endpoint for task deployment/detail context.
-- Wrapper should parse embedded arrays from HTML script blocks.
+- Wrapper should parse both embedded arrays and HTML section tables.
 
 ## `/Task/GetAttachments?taskID={id}` (GET)
 
@@ -106,6 +110,17 @@ Interpretation:
 
 Interpretation:
 - Attachments are served by a direct JSON endpoint and can be proxied without HTML scraping.
+
+## `/Task/GetMessagesByTaskID?taskID={id}` (GET)
+
+- Status observed: `200`
+- Content type: `application/json; charset=utf-8`
+- Request parameter: `taskID` (query string)
+- Response shape observed: array (empty array in observed samples)
+
+Interpretation:
+- Messages are available from a direct JSON endpoint keyed by task ID.
+- Wrapper can include this list in a consolidated task detail contract.
 
 ## `/Task/DeleteTaskProjectCode` (POST)
 
@@ -155,3 +170,13 @@ Interpretation:
 
 Interpretation:
 - Wrapper can retrieve available codes by reusing deployment page fetch and parsing `portfolioList`.
+
+## Wrapper Contract Consolidation (2026-03-04)
+
+- Previous wrapper route `GET /api/v1/tasks/deployment` is replaced by:
+  - `GET /api/v1/tasks/{taskId}`
+- New wrapper route aggregates:
+  - deployment HTML sections (`primaryDetails`, `secondaryFields`, `assignmentControl`)
+  - embedded JS arrays (`projectCodes.available`, `projectCodes.assigned`)
+  - attachments JSON (`/Task/GetAttachments`)
+  - messages JSON (`/Task/GetMessagesByTaskID`)

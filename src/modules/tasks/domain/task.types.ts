@@ -40,6 +40,10 @@ export interface TaskAttachment {
   fileUrl?: string;
   uploadedBy?: string;
   uploadedAt?: string;
+  description?: string;
+  userName?: string;
+  createDate?: string;
+  taskAttachmentsID?: number;
   [key: string]: unknown;
 }
 
@@ -66,18 +70,93 @@ export interface TaskAssignedProjectCode {
   [key: string]: unknown;
 }
 
-export interface GetTaskDeploymentInput {
+export interface TaskMessage {
+  [key: string]: unknown;
+}
+
+export interface TaskPrimaryJobLink {
+  label: string;
+  taskId: number | null;
+  href: string | null;
+}
+
+export interface TaskPrimaryDetails {
+  taskCode: string | null;
+  creationDate: string | null;
+  jobId: string | null;
+  jobLinks: TaskPrimaryJobLink[];
+  startDate: string | null;
+  customerBu: string | null;
+  estimatedClosingDate: string | null;
+  endCustomer: string | null;
+  endDate: string | null;
+  legalEntity: string | null;
+  managerArea: string | null;
+  forecastRevenueAmount: string | null;
+  forecastCostAmount: string | null;
+  projectType: string | null;
+  jobType: string | null;
+  extra: Record<string, string | null>;
+}
+
+export interface TaskSecondaryField {
+  taskSecondaryFieldId: number | null;
+  label: string;
+  value: string | null;
+}
+
+export interface TaskAssignmentRow {
+  resource: string | null;
+  positionTitle: string | null;
+  dayValues: Record<string, string | null>;
+}
+
+export interface TaskVendorAssignment {
+  title: string | null;
+  resourceName: string | null;
+  role: string | null;
+  totalHours: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  extra: Record<string, string | null>;
+}
+
+export interface TaskAssignmentControl {
+  headers: string[];
+  inHouseRows: TaskAssignmentRow[];
+  vendorSummary: string | null;
+  vendorAssignments: TaskVendorAssignment[];
+}
+
+export interface GetTaskDetailInput {
   cookieHeader: string;
   taskId: number;
 }
 
-export interface GetTaskDeploymentResult {
+export interface GetTaskDetailResult {
   taskId: number;
-  portfolioList: TaskPortfolioCode[];
-  assignedProjectCodes: TaskAssignedProjectCode[];
+  primaryDetails: TaskPrimaryDetails;
+  secondaryFields: TaskSecondaryField[];
+  assignmentControl: TaskAssignmentControl;
+  projectCodes: {
+    available: TaskPortfolioCode[];
+    assigned: TaskAssignedProjectCode[];
+  };
+  attachments: TaskAttachment[];
+  messages: TaskMessage[];
   upstream: {
-    status: number;
-    url: string;
+    deployment: {
+      status: number;
+      url: string;
+    };
+    attachments: {
+      status: number;
+      url: string;
+    };
+    messages: {
+      status: number;
+      url: string;
+    };
   };
 }
 

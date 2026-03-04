@@ -32,10 +32,10 @@ const main = async (): Promise<void> => {
     const auth = loginBody.auth as { cookieHeader?: string } | undefined;
     const cookieHeader = auth?.cookieHeader ?? "";
 
-    const deploymentResponse = await fetch(`${baseUrl}/tasks/deployment?taskId=${encodeURIComponent(String(taskId))}`, {
+    const taskResponse = await fetch(`${baseUrl}/tasks/${encodeURIComponent(String(taskId))}`, {
       headers: { "x-danella-cookie": cookieHeader },
     });
-    const deploymentBody = (await deploymentResponse.json()) as JsonRecord;
+    const taskBody = (await taskResponse.json()) as JsonRecord;
 
     const attachmentsResponse = await fetch(`${baseUrl}/tasks/attachments?taskId=${encodeURIComponent(String(taskId))}`, {
       headers: { "x-danella-cookie": cookieHeader },
@@ -51,20 +51,28 @@ const main = async (): Promise<void> => {
     );
     const deleteValidationBody = (await deleteValidationResponse.json()) as JsonRecord;
 
-    const deploymentData =
-      typeof deploymentBody.data === "object" && deploymentBody.data !== null
-        ? (deploymentBody.data as Record<string, unknown>)
+    const taskData =
+      typeof taskBody.data === "object" && taskBody.data !== null
+        ? (taskBody.data as Record<string, unknown>)
         : {};
-    const portfolioList = Array.isArray(deploymentData.portfolioList) ? deploymentData.portfolioList : [];
-    const assigned = Array.isArray(deploymentData.assignedProjectCodes) ? deploymentData.assignedProjectCodes : [];
+    const projectCodes =
+      typeof taskData.projectCodes === "object" && taskData.projectCodes !== null
+        ? (taskData.projectCodes as Record<string, unknown>)
+        : {};
+    const available = Array.isArray(projectCodes.available) ? projectCodes.available : [];
+    const assigned = Array.isArray(projectCodes.assigned) ? projectCodes.assigned : [];
+    const secondaryFields = Array.isArray(taskData.secondaryFields) ? taskData.secondaryFields : [];
+    const taskAttachments = Array.isArray(taskData.attachments) ? taskData.attachments : [];
     const attachments = Array.isArray(attachmentsBody.data) ? attachmentsBody.data : [];
 
     console.log(
       JSON.stringify(
         {
-          deploymentStatus: deploymentResponse.status,
-          portfolioCount: portfolioList.length,
-          assignedProjectCodesCount: assigned.length,
+          taskStatus: taskResponse.status,
+          availableCodesCount: available.length,
+          assignedCodesCount: assigned.length,
+          secondaryFieldsCount: secondaryFields.length,
+          taskAttachmentsCount: taskAttachments.length,
           attachmentsStatus: attachmentsResponse.status,
           attachmentsCount: attachments.length,
           deleteValidationStatus: deleteValidationResponse.status,

@@ -691,3 +691,41 @@ Artifact JSON: `n/a (cleanup/behavior fix)`
 - Wrapper now returns `409` when upstream responds with business non-success (`success: false`) while preserving upstream status/url metadata.
 
 Artifact JSON: `none (local implementation + typecheck)`
+
+---
+## Run 2026-03-04 (Local Wrapper Migration - `Task Deployment` -> `Get Task`)
+
+### Wrapper Contract Change
+- Removed deployment-focused wrapper route contract:
+  - `GET /api/v1/tasks/deployment?taskId=...`
+- New canonical wrapper route:
+  - `GET /api/v1/tasks/:taskId`
+
+### Upstream Sources Consolidated
+- `GET /Task/DeploymentProject?TaskID={taskId}` (HTML)
+  - Parsed primary details table (`#tablaTaskDetail`)
+  - Parsed secondary fields table (`#tablaSecondaryFields`)
+  - Parsed assignment matrix (`#tablaAssignment`)
+  - Parsed vendor assignment cards (`.card.border.rounded.shadow-sm.small`)
+  - Parsed embedded arrays:
+    - `const portfolioList = [...]` (available codes)
+    - `const assigned = [...]` (assigned codes)
+- `GET /Task/GetAttachments?taskID={taskId}` (JSON)
+- `GET /Task/GetMessagesByTaskID?taskID={taskId}` (JSON)
+
+### Real Task Evidence (Browser)
+- Page inspected: `TaskID=8713`
+- Embedded arrays observed:
+  - `portfolioList.length = 61`
+  - `assigned.length = 1`
+- Attachments endpoint observed:
+  - `GET /Task/GetAttachments?taskID=8713` -> `200`, `2` items
+- Messages endpoint observed:
+  - `GET /Task/GetMessagesByTaskID?taskID=8713` -> `200`, `[]`
+
+### Notes
+- Primary/secondary fields may contain empty values; wrapper normalizes to `null`.
+- Assignment day columns are dynamic; wrapper maps them into `dayValues` by header label.
+- `Task Deployment` naming removed from wrapper docs and route contract in favor of `Get Task`.
+
+Artifact JSON: `none (implementation + browser validation)`

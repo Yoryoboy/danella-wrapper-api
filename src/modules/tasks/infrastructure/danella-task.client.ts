@@ -13,18 +13,24 @@ import {
   type CreateTaskResult,
   type GetTaskAttachmentsInput,
   type GetTaskAttachmentsResult,
-  type GetTaskDeploymentInput,
-  type GetTaskDeploymentResult,
+  type GetTaskDetailInput,
+  type GetTaskDetailResult,
   type GetTaskFormMetadataInput,
   type GetTaskFormMetadataResult,
   type ListTasksInput,
   type ListTasksResult,
+  type TaskAssignmentControl,
+  type TaskAssignmentRow,
   type TaskAssignedProjectCode,
   type TaskAttachment,
+  type TaskMessage,
   type TaskMetadataDictionaryItem,
   type TaskMetadataJobTypeDictionaryItem,
+  type TaskPrimaryDetails,
   type TaskPortfolioCode,
   type TaskRepository,
+  type TaskSecondaryField,
+  type TaskVendorAssignment,
   type UpstreamTask,
 } from "../domain";
 
@@ -139,6 +145,283 @@ const extractSelectDictionary = ($: cheerio.CheerioAPI, selector: string): TaskM
 
 const hasDictionaryEntry = (entries: TaskMetadataDictionaryItem[], id: number): boolean =>
   entries.some((entry) => entry.id === id);
+
+type LabelValuePair = {
+  label: string;
+  value: string | null;
+};
+
+const normalizeCellValue = (value: string): string | null => {
+  const normalized = normalizeLabelText(value);
+  return normalized.length > 0 ? normalized : null;
+};
+
+const extractLabelValuePairs = ($: cheerio.CheerioAPI, tableSelector: string): LabelValuePair[] => {
+  const pairs: LabelValuePair[] = [];
+
+  $(`${tableSelector} tr`).each((_idx, row) => {
+    const cells = $(row).find("th, td").toArray();
+    if (cells.length < 2) {
+      return;
+    }
+
+    for (let index = 0; index + 1 < cells.length; index += 2) {
+      const label = normalizeCellValue($(cells[index]).text());
+      if (!label) {
+        continue;
+      }
+
+      const value = normalizeCellValue($(cells[index + 1]).text());
+      pairs.push({ label, value });
+    }
+  });
+
+  return pairs;
+};
+
+const getFirstMappedValue = (pairs: LabelValuePair[], label: string): string | null => {
+  const item = pairs.find((pair) => pair.label.toLowerCase() === label.toLowerCase());
+  return item ? item.value : null;
+};
+
+const extractTaskIdFromHref = (href: string | undefined): number | null => {
+  if (!href) {
+    return null;
+  }
+
+  const match = href.match(/[?&]TaskID=(\d+)/i);
+  if (!match?.[1]) {
+    return null;
+  }
+
+  const parsed = Number(match[1]);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const extractPrimaryJobLinks = ($: cheerio.CheerioAPI): { label: string; taskId: number | null; href: string | null }[] => {
+  const jobLinks: { label: string; taskId: number | null; href: string | null }[] = [];
+
+  $("#tablaTaskDetail tr").each((_idx, row) => {
+    const cells = $(row).find("th, td").toArray();
+    if (cells.length < 2) {
+      return;
+    }
+
+    const firstCell = normalizeCellValue($(cells[0]).text());
+    if (firstCell?.toLowerCase() !== "job id") {
+      return;
+    }
+
+    $(cells[1])
+      .find("a")
+      .each((_anchorIdx, anchor) => {
+        const label = normalizeCellValue($(anchor).text());
+        if (!label) {
+          return;
+        }
+
+        const href = $(anchor).attr("href") ?? null;
+        jobLinks.push({
+          label,
+          taskId: extractTaskIdFromHref(href ?? undefined),
+          href,
+        });
+      });
+  });
+
+  return jobLinks;
+};
+
+const buildPrimaryDetails = ($: cheerio.CheerioAPI): TaskPrimaryDetails => {
+  const pairs = extractLabelValuePairs($, "#tablaTaskDetail");
+  const knownLabels = new Set([
+    "Sub-Project Identifier - (Task ID)",
+    "Creation Date",
+    "Job ID",
+    "Star Date",
+    "Start Date",
+    "Customer (BU)",
+    "Estimated Closing Date",
+    "End Customer",
+    "End Date",
+    "Legal Entity",
+    "Manager Area",
+    "Frecast Revenue Amount",
+    "Forecast Revenue Amount",
+    "Frecast Cost Amount",
+    "Forecast Cost Amount",
+    "Project Type",
+    "Job Type",
+  ]);
+
+  const extra = pairs.reduce<Record<string, string | null>>((acc, pair) => {
+    if (knownLabels.has(pair.label)) {
+      return acc;
+    }
+
+    acc[pair.label] = pair.value;
+    return acc;
+  }, {});
+
+  return {
+    taskCode: getFirstMappedValue(pairs, "Sub-Project Identifier - (Task ID)"),
+    creationDate: getFirstMappedValue(pairs, "Creation Date"),
+    jobId: getFirstMappedValue(pairs, "Job ID"),
+    jobLinks: extractPrimaryJobLinks($),
+    startDate: getFirstMappedValue(pairs, "Star Date") ?? getFirstMappedValue(pairs, "Start Date"),
+    customerBu: getFirstMappedValue(pairs, "Customer (BU)"),
+    estimatedClosingDate: getFirstMappedValue(pairs, "Estimated Closing Date"),
+    endCustomer: getFirstMappedValue(pairs, "End Customer"),
+    endDate: getFirstMappedValue(pairs, "End Date"),
+    legalEntity: getFirstMappedValue(pairs, "Legal Entity"),
+    managerArea: getFirstMappedValue(pairs, "Manager Area"),
+    forecastRevenueAmount:
+      getFirstMappedValue(pairs, "Frecast Revenue Amount") ??
+      getFirstMappedValue(pairs, "Forecast Revenue Amount"),
+    forecastCostAmount:
+      getFirstMappedValue(pairs, "Frecast Cost Amount") ?? getFirstMappedValue(pairs, "Forecast Cost Amount"),
+    projectType: getFirstMappedValue(pairs, "Project Type"),
+    jobType: getFirstMappedValue(pairs, "Job Type"),
+    extra,
+  };
+};
+
+const extractSecondaryFieldIds = ($: cheerio.CheerioAPI): Array<number | null> => {
+  const ids: Array<number | null> = [];
+
+  $("input[type='hidden'][name$='.TaskSecondaryFieldID']").each((_idx, input) => {
+    const rawValue = $(input).attr("value") ?? $(input).val();
+    ids.push(toPositiveInt(rawValue));
+  });
+
+  return ids;
+};
+
+const buildSecondaryFields = ($: cheerio.CheerioAPI): TaskSecondaryField[] => {
+  const pairs = extractLabelValuePairs($, "#tablaSecondaryFields");
+  const fieldIds = extractSecondaryFieldIds($);
+
+  return pairs.map((pair, index) => ({
+    taskSecondaryFieldId: fieldIds[index] ?? null,
+    label: pair.label,
+    value: pair.value,
+  }));
+};
+
+const extractVendorSummary = ($: cheerio.CheerioAPI): string | null => {
+  const text = normalizeLabelText($("main").text());
+  const match = text.match(/\d+\s*pv\s*\|\s*Supplier/i);
+  return match?.[0] ?? null;
+};
+
+const extractVendorAssignments = ($: cheerio.CheerioAPI): TaskVendorAssignment[] => {
+  const assignments: TaskVendorAssignment[] = [];
+
+  $("div.card.border.rounded.shadow-sm.small").each((_idx, card) => {
+    const cardPairs: LabelValuePair[] = [];
+
+    $(card)
+      .find("p")
+      .each((_pairIdx, paragraph) => {
+        const labelNode = $(paragraph).find("strong").first();
+        if (!labelNode.length) {
+          return;
+        }
+
+        const label = normalizeCellValue(labelNode.text());
+        if (!label) {
+          return;
+        }
+
+        const value = normalizeCellValue(
+          $(paragraph)
+            .clone()
+            .find("strong")
+            .remove()
+            .end()
+            .text(),
+        );
+        cardPairs.push({ label, value });
+      });
+
+    if (cardPairs.length === 0) {
+      return;
+    }
+
+    const firstPair = cardPairs[0];
+    const getValue = (label: string): string | null => {
+      const item = cardPairs.find((pair) => pair.label.toLowerCase() === label.toLowerCase());
+      return item ? item.value : null;
+    };
+
+    const reserved = new Set(["Role", "Total Hrs. Assignment", "Start Date", "End Date"]);
+    const extra = cardPairs.reduce<Record<string, string | null>>((acc, pair, index) => {
+      if (index === 0 || reserved.has(pair.label)) {
+        return acc;
+      }
+
+      acc[pair.label] = pair.value;
+      return acc;
+    }, {});
+
+    assignments.push({
+      title: firstPair.label,
+      resourceName: firstPair.value,
+      role: getValue("Role"),
+      totalHours: getValue("Total Hrs. Assignment"),
+      startDate: getValue("Start Date"),
+      endDate: getValue("End Date"),
+      extra,
+    });
+  });
+
+  return assignments;
+};
+
+const buildAssignmentControl = ($: cheerio.CheerioAPI): TaskAssignmentControl => {
+  const headers = $("#tablaAssignment thead th")
+    .toArray()
+    .map((header) => normalizeCellValue($(header).text()))
+    .filter((value): value is string => Boolean(value));
+
+  const rows: TaskAssignmentRow[] = [];
+
+  $("#tablaAssignment tbody tr").each((_idx, row) => {
+    const cells = $(row).find("td").toArray();
+    if (cells.length === 0) {
+      return;
+    }
+
+    const resource = normalizeCellValue($(cells[0]).text());
+    const positionTitle = normalizeCellValue($(cells[1]).text());
+    const dayValues = headers.slice(2).reduce<Record<string, string | null>>((acc, label, dayIndex) => {
+      const cellValue = cells[dayIndex + 2] ? normalizeCellValue($(cells[dayIndex + 2]).text()) : null;
+      acc[label] = cellValue;
+      return acc;
+    }, {});
+
+    rows.push({
+      resource,
+      positionTitle,
+      dayValues,
+    });
+  });
+
+  return {
+    headers,
+    inHouseRows: rows,
+    vendorSummary: extractVendorSummary($),
+    vendorAssignments: extractVendorAssignments($),
+  };
+};
+
+const normalizeMessages = (data: unknown): TaskMessage[] => {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data as TaskMessage[];
+};
 
 export class DanellaTaskClient implements TaskRepository {
   private readonly http: AxiosInstance;
@@ -400,38 +683,105 @@ export class DanellaTaskClient implements TaskRepository {
     }
   }
 
-  async getDeployment(input: GetTaskDeploymentInput): Promise<GetTaskDeploymentResult> {
-    const url = toAbsoluteUrl(
+  async getTaskDetail(input: GetTaskDetailInput): Promise<GetTaskDetailResult> {
+    const deploymentUrl = toAbsoluteUrl(
       env.danella.baseUrl,
       `/Task/DeploymentProject?TaskID=${encodeURIComponent(String(input.taskId))}`,
     );
+    const attachmentsUrl = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/GetAttachments?taskID=${encodeURIComponent(String(input.taskId))}`,
+    );
+    const messagesUrl = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/GetMessagesByTaskID?taskID=${encodeURIComponent(String(input.taskId))}`,
+    );
 
     try {
-      const response = await this.http.get<string>(url, {
+      const deploymentResponse = await this.http.get<string>(deploymentUrl, {
         headers: { Cookie: input.cookieHeader },
         maxRedirects: 0,
         validateStatus: () => true,
       });
 
-      if (response.status >= 500) {
+      if (deploymentResponse.status >= 500) {
         throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream deployment endpoint");
       }
 
-      if (isRedirectedToLogin(response) || isLoginHtml(response.data)) {
+      if (isRedirectedToLogin(deploymentResponse) || isLoginHtml(deploymentResponse.data)) {
         throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
       }
 
+      const attachmentsResponse = await this.http.get<unknown>(attachmentsUrl, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (attachmentsResponse.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream attachments endpoint");
+      }
+
+      if (isRedirectedToLogin(attachmentsResponse)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof attachmentsResponse.data === "string" && isLoginHtml(attachmentsResponse.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (!Array.isArray(attachmentsResponse.data)) {
+        throw new AppError(502, "UPSTREAM_PARSE_ERROR", "Unexpected attachments response format from upstream");
+      }
+
+      const messagesResponse = await this.http.get<unknown>(messagesUrl, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (messagesResponse.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream messages endpoint");
+      }
+
+      if (isRedirectedToLogin(messagesResponse)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof messagesResponse.data === "string" && isLoginHtml(messagesResponse.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      const $ = cheerio.load(deploymentResponse.data);
+
       return {
         taskId: input.taskId,
-        portfolioList: extractConstArray<TaskPortfolioCode>(response.data, "portfolioList"),
-        assignedProjectCodes: extractConstArray<TaskAssignedProjectCode>(response.data, "assigned"),
+        primaryDetails: buildPrimaryDetails($),
+        secondaryFields: buildSecondaryFields($),
+        assignmentControl: buildAssignmentControl($),
+        projectCodes: {
+          available: extractConstArray<TaskPortfolioCode>(deploymentResponse.data, "portfolioList"),
+          assigned: extractConstArray<TaskAssignedProjectCode>(deploymentResponse.data, "assigned"),
+        },
+        attachments: attachmentsResponse.data as TaskAttachment[],
+        messages: normalizeMessages(messagesResponse.data),
         upstream: {
-          status: response.status,
-          url,
+          deployment: {
+            status: deploymentResponse.status,
+            url: deploymentUrl,
+          },
+          attachments: {
+            status: attachmentsResponse.status,
+            url: attachmentsUrl,
+          },
+          messages: {
+            status: messagesResponse.status,
+            url: messagesUrl,
+          },
         },
       };
     } catch (error) {
-      throw toUpstreamAppError(error, { endpoint: "upstream deployment endpoint" });
+      throw toUpstreamAppError(error, { endpoint: "upstream task detail endpoint" });
     }
   }
 

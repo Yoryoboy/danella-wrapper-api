@@ -1,146 +1,188 @@
-## Plan: Create Task Endpoint (`POST /api/v1/tasks?subProjectId=...`) — Updated Requirements
+## Plan: Replace `Task Deployment` With Unified `Get Task` Endpoint
 
 ### Summary
-Implement a wrapper endpoint to create tasks in Danella using existing form metadata as authoritative context.  
-This revision locks **both** `verifierKeyId` and `endCustomerId` as **required** inputs.
+Migrate from a deployment-focused endpoint (`GET /api/v1/tasks/deployment`) to a single task-detail endpoint (`GET /api/v1/tasks/:taskId`) that returns the full task view in normalized JSON.
+
+The goal is to expose all relevant data a client sees in Danella `DeploymentProject`:
+- primary task details
+- secondary fields
+- assignment control
+- available and assigned project codes
+- attachments
+- optional task messages
+
+This is a deliberate contract change. No backward-compatibility bridge is required because the API is not deployed and has no consumers yet.
 
 ---
 
 ## Locked Decisions
-- Path: `POST /api/v1/tasks?subProjectId={id}`
-- Input mode: IDs only
-- Response mode: minimal + upstream
-- `jobTypeDefault` from metadata is enforced (client cannot override)
-- Required fields in body:
-  - `jobId`
-  - `verifierKeyId` (**required**)
-  - `endCustomerId` (**required**)
-  - `managerAreaId` (required)
+- Remove/deprecate `Task Deployment` endpoint contract.
+- New canonical endpoint: `GET /api/v1/tasks/:taskId`.
+- Keep wrapper query-param mapping rule where needed, but task detail uses path param for resource identity.
+- Return stable sectioned response with predictable null/empty semantics.
+- Preserve upstream raw formatting for date/currency strings to avoid locale parsing regressions.
 
 ---
 
-## Public API Contract
+## Why This Change
+1. `deployment` naming is too narrow and currently surfaces mostly code-related arrays.
+2. Consumers need a real `get task` contract with full detail for one `taskId`.
+3. Upstream page is SSR + embedded JS; centralizing parsing in wrapper prevents frontend scraping duplication.
+4. Single endpoint simplifies client integration and caching boundaries.
+
+---
+
+## Final Public Contract (Target)
 
 ### Endpoint
-- `POST /api/v1/tasks?subProjectId=45`
+- `GET /api/v1/tasks/:taskId`
 - Auth: `x-danella-cookie` (or `Cookie`)
 
-### Request body
-```json
-{
-  "jobId": "Job Test",
-  "verifierKeyId": "000",
-  "endCustomerId": 5,
-  "managerAreaId": 5
-}
-```
-
-### Validation rules
-- `subProjectId`: required positive integer (query)
-- `jobId`: required non-empty string
-- `verifierKeyId`: required non-empty string
-- `endCustomerId`: required positive integer
-- `managerAreaId`: required positive integer
-
-### Response `200`
+### Response shape (`200`)
 ```json
 {
   "success": true,
-  "message": "Created successfully",
   "data": {
-    "subProjectId": 45,
-    "jobId": "Job Test",
-    "verifierKeyId": "000",
-    "endCustomerId": 5,
-    "managerAreaId": 5
+    "taskId": 8713,
+    "primaryDetails": {},
+    "secondaryFields": [],
+    "assignmentControl": {},
+    "projectCodes": {
+      "available": [],
+      "assigned": []
+    },
+    "attachments": [],
+    "messages": []
   },
   "upstream": {
-    "status": 200,
-    "url": "https://danella-x.com/Task/InsertTask"
+    "deployment": {
+      "status": 200,
+      "url": "https://danella-x.com/Task/DeploymentProject?TaskID=8713"
+    },
+    "attachments": {
+      "status": 200,
+      "url": "https://danella-x.com/Task/GetAttachments?taskID=8713"
+    },
+    "messages": {
+      "status": 200,
+      "url": "https://danella-x.com/Task/GetMessagesByTaskID?taskID=8713"
+    }
   }
 }
 ```
 
-### Errors
-- `400 VALIDATION_ERROR`
-- `401 SESSION_EXPIRED`
-- `409` upstream business non-success
-- `502 UPSTREAM_PARSE_ERROR`
-- `503 UPSTREAM_UNAVAILABLE`
+### Null/Empty Rules
+- Missing scalar field: `null`
+- Missing list/table: `[]`
+- Unknown primary labels: keep under `primaryDetails.extra`
 
 ---
 
-## Internal Mapping Flow
-1. Parse query/body.
-2. Read cookie header.
-3. Fetch metadata (`getTaskFormMetadata(subProjectId)`).
-4. Validate:
-   - `endCustomerId` exists in `endCustomers`
-   - `managerAreaId` exists in `managerAreas`
-5. Build upstream payload:
-```json
-{
-  "jobID": "<jobId>",
-  "endCustomerID": "<endCustomerId>",
-  "managerAreaID": "<managerAreaId>",
-  "customerID": "<metadata.customer.id>",
-  "projectID": "<metadata.project.id>",
-  "subProjectID": "<metadata.subProject.id>",
-  "projectTypeID": "<metadata.projectType.id>",
-  "verifierKeyID": "<verifierKeyId>",
-  "jobTypeID": "<metadata.jobTypeDefault.id>"
-}
-```
-6. Call `POST /Task/InsertTask`.
-7. Normalize success/message/upstream and return wrapper response.
+## Data Source Mapping
+1. `GET /Task/DeploymentProject?TaskID={taskId}` (HTML)
+   - `#tablaTaskDetail` -> `primaryDetails`
+   - `#tablaSecondaryFields` -> `secondaryFields`
+   - `#tablaAssignment` + vendor blocks -> `assignmentControl`
+   - `const portfolioList = [...]` -> `projectCodes.available`
+   - `const assigned = [...]` -> `projectCodes.assigned`
+2. `GET /Task/GetAttachments?taskID={taskId}` (JSON) -> `attachments`
+3. `GET /Task/GetMessagesByTaskID?taskID={taskId}` (JSON) -> `messages`
 
 ---
 
-## File-Level Change Plan
+## Typing Plan
 
-### Domain
-- `src/modules/tasks/domain/task.types.ts`
-  - Add `CreateTaskInput`, `CreateTaskResult` with `verifierKeyId` required.
-- `src/modules/tasks/domain/task-repository.ts`
-  - Add `createTask(input)` method signature.
+### Domain types (`src/modules/tasks/domain/task.types.ts`)
+- Add:
+  - `GetTaskDetailInput`
+  - `GetTaskDetailResult`
+  - `TaskPrimaryDetails`
+  - `TaskSecondaryField`
+  - `TaskAssignmentControl`
+  - `TaskVendorAssignment`
+  - `TaskMessage`
 
-### Application
-- Add `create-task.use-case.ts`
-  - Enforce required fields (`verifierKeyId`, `endCustomerId` included).
-- Export in `src/modules/tasks/application/index.ts`.
+### Repository contract (`src/modules/tasks/domain/task-repository.ts`)
+- Add `getTaskDetail(input: GetTaskDetailInput): Promise<GetTaskDetailResult>`
+- Remove `getDeployment` contract after migration.
 
-### Infrastructure
-- Extend `danella-task.client.ts` with `createTask`.
-- Reuse metadata fetch + catalog checks + upstream call.
-
-### Interfaces
-- Add schemas in `tasks.schemas.ts`:
-  - `createTaskQuerySchema`
-  - `createTaskBodySchema` (with required `verifierKeyId`)
-- Add controller method `create`.
-- Add route in `tasks.routes.ts`:
-  - `router.post("/", tasksController.create)`
+### Use case (`src/modules/tasks/application`)
+- Add `get-task-detail.use-case.ts` with validation and repository call.
+- Remove old `get-task-deployment.use-case.ts` wiring once new route is live.
 
 ---
 
-## Tests & Acceptance
-- `pnpm typecheck` passes.
-- Happy path create with valid cookie + payload returns `200/409` depending upstream.
-- Missing `verifierKeyId` => `400`.
-- Missing `endCustomerId` => `400`.
-- Invalid catalog IDs => `400`.
-- Missing cookie => `400`.
-- Expired cookie => `401`.
+## Interface/Routing Plan
+
+### Routes (`src/modules/tasks/interfaces/tasks.routes.ts`)
+- Add `router.get("/:taskId", tasksController.getById)`.
+- Remove `router.get("/deployment", ...)` and `router.get("/:taskId/deployment", ...)`.
+
+### Controller (`src/modules/tasks/interfaces/tasks.controller.ts`)
+- Add `getById` handler.
+- Keep attachments endpoint unchanged.
+- Remove deployment handler and related imports.
+
+### Schemas (`src/modules/tasks/interfaces/tasks.schemas.ts`)
+- Reuse `taskIdParamsSchema`.
+- Remove deployment-specific query usage.
 
 ---
 
-## Documentation Deliverables
-- Update root `README.md` with full endpoint contract.
-- Update Postman collection `danella-wrapper-api` with `Create Task` request + examples.
-- Update `findings/endpoint-behavior.md` and `findings/discovery-log.md` with mapping/validation notes.
+## Infrastructure Parsing Plan
+
+### `src/modules/tasks/infrastructure/danella-task.client.ts`
+- Implement `getTaskDetail` that:
+  1. Fetches deployment HTML.
+  2. Parses primary/secondary/assignment/vendor sections with `cheerio`.
+  3. Parses `portfolioList` and `assigned` with existing `extractConstArray`.
+  4. Fetches attachments and messages JSON.
+  5. Returns normalized aggregate result.
+
+### Shared HTML parser utilities
+- Add reusable helpers for:
+  - pair-table extraction
+  - day-column assignment extraction
+  - label normalization and safe null conversion
 
 ---
 
-## Assumptions
-- `endCustomerId` is the field you referred to as “EncontrarKeyId”.
-- `jobTypeDefault` remains non-editable from client side for this endpoint.
+## Documentation & Migration Deliverables
+
+### README
+- Remove `GET /api/v1/tasks/deployment` docs.
+- Add `GET /api/v1/tasks/:taskId` docs with full response and field semantics.
+- Update examples to reflect new contract.
+
+### Postman (required)
+- In collection `danella-wrapper-api`:
+  - remove or mark deprecated request: `Task Deployment`
+  - add new request: `Get Task`
+  - include params/auth/example response/errors
+  - add deprecation note in description: "Task Deployment replaced by Get Task"
+
+### Findings
+- Update `findings/endpoint-behavior.md` with new parsing strategy.
+- Update `findings/discovery-log.md` with run evidence from real task example.
+
+---
+
+## Validation & Acceptance Criteria
+1. `npx tsc --noEmit` passes.
+2. `GET /api/v1/tasks/:taskId` returns:
+   - empty-friendly response for sparse task (example: recent/new task)
+   - populated response for real task with assignments/codes/attachments.
+3. Old deployment endpoint removed from routes and docs.
+4. Postman collection updated in same change.
+5. README/findings/Postman are synchronized with implementation.
+
+---
+
+## Execution Order
+1. Domain + repository types/contracts.
+2. Application use case.
+3. Infrastructure parser + upstream calls.
+4. Controller/routes/schemas migration.
+5. README/findings updates.
+6. Postman collection update.
+7. Typecheck and smoke verification.
