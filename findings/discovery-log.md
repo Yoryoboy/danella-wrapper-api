@@ -635,3 +635,17 @@ Artifact JSON: `none (captured from browser devtools inspection)`
 Artifact JSON: `none (local wrapper smoke + in-process script)`
 
 ---
+## Run 2026-03-04 (Artifact Hygiene - TaskSubProject Snapshot)
+
+### Action
+- Persisted a sanitized HTML evidence artifact from TaskSubProject reverse engineering.
+- Redaction applied:
+  - Embedded `var tasksData = [...]` replaced with `var tasksData = []; // redacted tasksData`
+- Original temporary file removed from `tmp/`.
+
+### Notes
+- Purpose: keep traceability artifact in-repo under `findings/runs/` without carrying full task list payloads in `tmp/`.
+
+Artifact file: `findings/runs/2026-03-04-task-subproject-sanitized.html`
+
+---
