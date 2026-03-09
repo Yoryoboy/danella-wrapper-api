@@ -102,6 +102,49 @@ Interpretation:
 - This is the key upstream endpoint for task deployment/detail context.
 - Wrapper should parse both embedded arrays and HTML section tables.
 
+## `/Projects/SecondaryFields?ProjectID={id}` (GET)
+
+- Status observed: `200`
+- Content type: `text/html; charset=utf-8`
+- Request parameter: `ProjectID` (query string)
+- Structured HTML sections observed:
+  - Project heading in `main h4`
+  - Secondary fields table `#tablaSecondaryFields`
+- Row actions observed:
+  - `JOB NAME` -> `deleteSecondaryField(238)`
+  - `NODE ID` -> `deleteSecondaryField(239)`
+  - `TASK ID` -> `deleteSecondaryField(240)`
+  - `Time Justification` -> `deleteSecondaryField(243)`
+
+Interpretation:
+- This page exposes project-level secondary-field metadata.
+- The IDs on this page are project-scoped (`projectSecondaryFieldId`) and do not match the task-scoped IDs required by `/Task/UpdateTaskSecondaryFieldsAjax`.
+- Wrapper can expose a metadata endpoint keyed by `projectId` to list the configured labels for a project.
+
+## `/Task/UpdateTaskSecondaryFieldsAjax` (POST)
+
+- Status observed: `200`
+- Content type: `application/json; charset=utf-8`
+- Request content type: `application/x-www-form-urlencoded; charset=UTF-8`
+- Request body shape observed:
+  - `TaskID=9069`
+  - `Fields[166675].TaskSecondaryFieldID=166675`
+  - `Fields[166675].Value=test task id`
+  - `Fields[166676].TaskSecondaryFieldID=166676`
+  - `Fields[166676].Value=test node id`
+  - `Fields[166677].TaskSecondaryFieldID=166677`
+  - `Fields[166677].Value=test name`
+  - `Fields[166678].TaskSecondaryFieldID=166678`
+  - `Fields[166678].Value=tst justification`
+- Frontend success contract observed:
+  - Page serializes `#formEditSecondaryFields` and submits it with `$.post`.
+  - Expects JSON with `success` (boolean) and `message` (string).
+  - On success, UI shows a success alert and reloads the deployment page.
+
+Interpretation:
+- Task secondary-field updates are keyed by task-scoped `TaskSecondaryFieldID`, not by project-scoped field IDs.
+- `GET /api/v1/tasks/:taskId` remains the authoritative source for `taskSecondaryFieldId` values needed for an eventual update endpoint.
+
 ## `/Task/GetAttachments?taskID={id}` (GET)
 
 - Status (authenticated): `200`

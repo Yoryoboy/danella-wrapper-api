@@ -729,3 +729,42 @@ Artifact JSON: `none (local implementation + typecheck)`
 - `Task Deployment` naming removed from wrapper docs and route contract in favor of `Get Task`.
 
 Artifact JSON: `none (implementation + browser validation)`
+
+---
+## Run 2026-03-09 (Browser Reverse Engineering - Project Secondary Fields + Local Wrapper Endpoint)
+
+### Browser Evidence
+- Project metadata page inspected: `GET https://danella-x.com/Projects/SecondaryFields?ProjectID=25` -> `200`
+- Page title context observed:
+  - Section heading: `Secondary Fields`
+  - Project heading: `A-NxWs - NxWs - High Split`
+- Table observed: `#tablaSecondaryFields`
+- Project-level secondary field rows observed:
+  - `JOB NAME` -> `deleteSecondaryField(238)`
+  - `NODE ID` -> `deleteSecondaryField(239)`
+  - `TASK ID` -> `deleteSecondaryField(240)`
+  - `Time Justification` -> `deleteSecondaryField(243)`
+
+### Correlation With Task Edit Flow
+- Task edit AJAX previously observed:
+  - `POST https://danella-x.com/Task/UpdateTaskSecondaryFieldsAjax` -> `200`
+  - Uses task-scoped IDs such as `166675`, `166676`, `166677`, `166678`
+- Conclusion:
+  - Project page IDs are project-scoped metadata IDs.
+  - Task update endpoint requires task-scoped `TaskSecondaryFieldID` values.
+
+### Wrapper Implementation
+- New route wired: `GET /api/v1/tasks/secondary-fields?projectId={id}`
+- Upstream mapping used:
+  - `GET /Projects/SecondaryFields?ProjectID={projectId}`
+- Wrapper response contract:
+  - `data[]` items with `projectSecondaryFieldId` and `label`
+  - `meta.projectId`
+  - `meta.projectName`
+  - `meta.count`
+- Validation:
+  - `projectId` required as positive integer
+  - cookie header required
+- Typecheck: `pnpm typecheck` -> `pass`
+
+Artifact JSON: `none (browser inspection + local implementation)`

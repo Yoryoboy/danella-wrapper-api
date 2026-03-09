@@ -12,6 +12,11 @@ export interface GetTaskFormMetadataInput {
   subProjectId: number;
 }
 
+export interface GetProjectSecondaryFieldsInput {
+  cookieHeader: string;
+  projectId: number;
+}
+
 export interface CreateTaskInput {
   cookieHeader: string;
   subProjectId: number;
@@ -103,6 +108,11 @@ export interface TaskSecondaryField {
   taskSecondaryFieldId: number | null;
   label: string;
   value: string | null;
+}
+
+export interface ProjectSecondaryField {
+  projectSecondaryFieldId: number | null;
+  label: string;
 }
 
 export interface TaskAssignmentRow {
@@ -217,6 +227,16 @@ export interface GetTaskFormMetadataResult {
     url: string;
     jobTypesStatus: number;
     jobTypesUrl: string;
+  };
+}
+
+export interface GetProjectSecondaryFieldsResult {
+  projectId: number;
+  projectName: string | null;
+  items: ProjectSecondaryField[];
+  upstream: {
+    status: number;
+    url: string;
   };
 }
 

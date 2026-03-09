@@ -1,4 +1,5 @@
 export * from "./create-task.use-case";
+export * from "./get-project-secondary-fields.use-case";
 export * from "./get-task-attachments.use-case";
 export * from "./get-task-detail.use-case";
 export * from "./get-task-form-metadata.use-case";

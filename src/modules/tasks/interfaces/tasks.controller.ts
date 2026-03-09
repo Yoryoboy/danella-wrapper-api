@@ -4,6 +4,7 @@ import { AppError } from "../../../shared/domain/app-error";
 import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-header";
 import type {
   CreateTaskUseCase,
+  GetProjectSecondaryFieldsUseCase,
   GetTaskAttachmentsUseCase,
   GetTaskDetailUseCase,
   GetTaskFormMetadataUseCase,
@@ -13,6 +14,7 @@ import {
   createTaskBodySchema,
   createTaskQuerySchema,
   listTasksQuerySchema,
+  projectSecondaryFieldsQuerySchema,
   taskFormMetadataQuerySchema,
   taskIdParamsSchema,
   taskIdQuerySchema,
@@ -22,6 +24,7 @@ export class TasksController {
   constructor(
     private readonly listTasksUseCase: ListTasksUseCase,
     private readonly createTaskUseCase: CreateTaskUseCase,
+    private readonly getProjectSecondaryFieldsUseCase: GetProjectSecondaryFieldsUseCase,
     private readonly getTaskDetailUseCase: GetTaskDetailUseCase,
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
     private readonly getTaskFormMetadataUseCase: GetTaskFormMetadataUseCase,
@@ -112,6 +115,44 @@ export class TasksController {
           result.message ??
           (result.success ? "Created successfully" : "Upstream task creation did not succeed"),
         data: result.data,
+        upstream: result.upstream,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  projectSecondaryFields: RequestHandler = async (req, res, next) => {
+    const parsedQuery = projectSecondaryFieldsQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", {
+          fields: parsedQuery.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    try {
+      const result = await this.getProjectSecondaryFieldsUseCase.execute({
+        cookieHeader,
+        projectId: parsedQuery.data.projectId,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result.items,
+        meta: {
+          projectId: result.projectId,
+          projectName: result.projectName,
+          count: result.items.length,
+        },
         upstream: result.upstream,
       });
     } catch (error) {

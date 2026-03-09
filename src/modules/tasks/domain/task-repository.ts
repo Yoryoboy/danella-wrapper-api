@@ -5,6 +5,8 @@ import type {
   GetTaskAttachmentsResult,
   GetTaskDetailInput,
   GetTaskDetailResult,
+  GetProjectSecondaryFieldsInput,
+  GetProjectSecondaryFieldsResult,
   GetTaskFormMetadataInput,
   GetTaskFormMetadataResult,
   ListTasksInput,
@@ -16,5 +18,6 @@ export interface TaskRepository {
   getTaskDetail(input: GetTaskDetailInput): Promise<GetTaskDetailResult>;
   getAttachments(input: GetTaskAttachmentsInput): Promise<GetTaskAttachmentsResult>;
   getTaskFormMetadata(input: GetTaskFormMetadataInput): Promise<GetTaskFormMetadataResult>;
+  getProjectSecondaryFields(input: GetProjectSecondaryFieldsInput): Promise<GetProjectSecondaryFieldsResult>;
   createTask(input: CreateTaskInput): Promise<CreateTaskResult>;
 }

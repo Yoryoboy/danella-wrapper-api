@@ -323,6 +323,84 @@ Query param contract:
 }
 ```
 
+- `GET /api/v1/tasks/secondary-fields?projectId=25`
+- Description: Returns the catalog of secondary fields configured for a project by scraping the upstream project secondary-fields page. This endpoint is metadata-only and is intended to support task edit flows; task updates still require task-level `taskSecondaryFieldId` values from `GET /api/v1/tasks/:taskId`.
+- Query params:
+  - `projectId` (required, integer)
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200`:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "projectSecondaryFieldId": 238,
+      "label": "JOB NAME"
+    },
+    {
+      "projectSecondaryFieldId": 239,
+      "label": "NODE ID"
+    },
+    {
+      "projectSecondaryFieldId": 240,
+      "label": "TASK ID"
+    },
+    {
+      "projectSecondaryFieldId": 243,
+      "label": "Time Justification"
+    }
+  ],
+  "meta": {
+    "projectId": 25,
+    "projectName": "A-NxWs - NxWs - High Split",
+    "count": 4
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Projects/SecondaryFields?ProjectID=25"
+  }
+}
+```
+
+- Response `400`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid query parameters"
+  }
+}
+```
+
+- Response `401`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "SESSION_EXPIRED",
+    "message": "Danella session is expired or invalid"
+  }
+}
+```
+
+- Response `503`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UPSTREAM_UNAVAILABLE",
+    "message": "Could not reach upstream project secondary fields endpoint"
+  }
+}
+```
+
 - `POST /api/v1/tasks?subProjectId=45`
 - Description: Creates a task in Danella by combining client-provided IDs with authoritative form metadata from the same sub-project.
 - Upstream mapping:

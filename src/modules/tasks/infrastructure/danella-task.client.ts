@@ -13,12 +13,15 @@ import {
   type CreateTaskResult,
   type GetTaskAttachmentsInput,
   type GetTaskAttachmentsResult,
+  type GetProjectSecondaryFieldsInput,
+  type GetProjectSecondaryFieldsResult,
   type GetTaskDetailInput,
   type GetTaskDetailResult,
   type GetTaskFormMetadataInput,
   type GetTaskFormMetadataResult,
   type ListTasksInput,
   type ListTasksResult,
+  type ProjectSecondaryField,
   type TaskAssignmentControl,
   type TaskAssignmentRow,
   type TaskAssignedProjectCode,
@@ -308,6 +311,30 @@ const buildSecondaryFields = ($: cheerio.CheerioAPI): TaskSecondaryField[] => {
   }));
 };
 
+const buildProjectSecondaryFields = ($: cheerio.CheerioAPI): ProjectSecondaryField[] => {
+  return $("#tablaSecondaryFields tbody tr")
+    .toArray()
+    .reduce<ProjectSecondaryField[]>((acc, row) => {
+      const cells = $(row).find("td").toArray();
+      const label = cells[0] ? normalizeCellValue($(cells[0]).text()) : null;
+      const button = cells[1] ? $(cells[1]).find("button[onclick*='deleteSecondaryField(']").first() : null;
+      const onclick = button?.attr("onclick") ?? "";
+      const match = onclick.match(/deleteSecondaryField\((\d+)\)/i);
+      const projectSecondaryFieldId = match?.[1] ? Number(match[1]) : null;
+
+      if (!label) {
+        return acc;
+      }
+
+      acc.push({
+        projectSecondaryFieldId: Number.isInteger(projectSecondaryFieldId) ? projectSecondaryFieldId : null,
+        label,
+      });
+
+      return acc;
+    }, []);
+};
+
 const extractVendorSummary = ($: cheerio.CheerioAPI): string | null => {
   const text = normalizeLabelText($("main").text());
   const match = text.match(/\d+\s*pv\s*\|\s*Supplier/i);
@@ -587,6 +614,47 @@ export class DanellaTaskClient implements TaskRepository {
       };
     } catch (error) {
       throw toUpstreamAppError(error, { endpoint: "upstream task form metadata endpoint" });
+    }
+  }
+
+  async getProjectSecondaryFields(input: GetProjectSecondaryFieldsInput): Promise<GetProjectSecondaryFieldsResult> {
+    const url = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Projects/SecondaryFields?ProjectID=${encodeURIComponent(String(input.projectId))}`,
+    );
+
+    try {
+      const response = await this.http.get<string>(url, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream project secondary fields endpoint");
+      }
+
+      if (isRedirectedToLogin(response) || isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      const $ = cheerio.load(response.data);
+      const projectHeading = $("main h4")
+        .toArray()
+        .map((node) => normalizeCellValue($(node).text()))
+        .find((value, index, all) => Boolean(value) && index > 0 && value !== all[0]) ?? null;
+
+      return {
+        projectId: input.projectId,
+        projectName: projectHeading,
+        items: buildProjectSecondaryFields($),
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      throw toUpstreamAppError(error, { endpoint: "upstream project secondary fields endpoint" });
     }
   }
 
