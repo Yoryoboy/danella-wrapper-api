@@ -58,9 +58,21 @@ export const createTaskBodySchema = z.object({
   managerAreaId: z.coerce.number().int().positive(),
 });
 
+export const updateTaskSecondaryFieldsBodySchema = z.object({
+  fields: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1),
+        value: z.string(),
+      }),
+    )
+    .min(1),
+});
+
 export type TaskIdParams = z.infer<typeof taskIdParamsSchema>;
 export type TaskIdQuery = z.infer<typeof taskIdQuerySchema>;
 export type TaskFormMetadataQuery = z.infer<typeof taskFormMetadataQuerySchema>;
 export type ProjectSecondaryFieldsQuery = z.infer<typeof projectSecondaryFieldsQuerySchema>;
 export type CreateTaskQuery = z.infer<typeof createTaskQuerySchema>;
 export type CreateTaskBody = z.infer<typeof createTaskBodySchema>;
+export type UpdateTaskSecondaryFieldsBody = z.infer<typeof updateTaskSecondaryFieldsBodySchema>;

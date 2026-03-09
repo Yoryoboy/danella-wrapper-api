@@ -401,6 +401,115 @@ Query param contract:
 }
 ```
 
+- `PATCH /api/v1/tasks/secondary-fields?taskId=9069`
+- Description: Updates one or more task secondary fields by label. The wrapper first loads the task detail, resolves each label to its task-scoped `taskSecondaryFieldId`, sends the upstream update request, and then refetches the task to verify that the values were actually persisted.
+- Query params:
+  - `taskId` (required, integer)
+- Request body:
+
+```json
+{
+  "fields": [
+    {
+      "label": "TASK ID",
+      "value": "new task id value"
+    },
+    {
+      "label": "NODE ID",
+      "value": ""
+    }
+  ]
+}
+```
+
+- Validation rules:
+  - `fields` must contain at least one item
+  - each item requires a non-empty `label`
+  - duplicate labels in the same request are rejected
+  - each label must exist in the target task's `secondaryFields`
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200`:
+
+```json
+{
+  "success": true,
+  "message": "Secondary fields updated successfully.",
+  "data": {
+    "taskId": 9069,
+    "updatedFields": [
+      {
+        "taskSecondaryFieldId": 166675,
+        "label": "TASK ID",
+        "value": "new task id value"
+      },
+      {
+        "taskSecondaryFieldId": 166676,
+        "label": "NODE ID",
+        "value": ""
+      }
+    ],
+    "secondaryFields": [
+      {
+        "taskSecondaryFieldId": 166675,
+        "label": "TASK ID",
+        "value": "new task id value"
+      },
+      {
+        "taskSecondaryFieldId": 166676,
+        "label": "NODE ID",
+        "value": null
+      }
+    ]
+  },
+  "upstream": {
+    "update": {
+      "status": 200,
+      "url": "https://danella-x.com/Task/UpdateTaskSecondaryFieldsAjax"
+    },
+    "verification": {
+      "deployment": {
+        "status": 200,
+        "url": "https://danella-x.com/Task/DeploymentProject?TaskID=9069"
+      },
+      "attachments": {
+        "status": 200,
+        "url": "https://danella-x.com/Task/GetAttachments?taskID=9069"
+      },
+      "messages": {
+        "status": 200,
+        "url": "https://danella-x.com/Task/GetMessagesByTaskID?taskID=9069"
+      }
+    }
+  }
+}
+```
+
+- Response `400`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Secondary field label is not available for task 9069: UNKNOWN FIELD"
+  }
+}
+```
+
+- Response `502`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UPSTREAM_STATE_MISMATCH",
+    "message": "Upstream did not persist secondary field update for label: TASK ID"
+  }
+}
+```
+
 - `POST /api/v1/tasks?subProjectId=45`
 - Description: Creates a task in Danella by combining client-provided IDs with authoritative form metadata from the same sub-project.
 - Upstream mapping:

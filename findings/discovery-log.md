@@ -768,3 +768,43 @@ Artifact JSON: `none (implementation + browser validation)`
 - Typecheck: `pnpm typecheck` -> `pass`
 
 Artifact JSON: `none (browser inspection + local implementation)`
+
+---
+## Run 2026-03-09 (Local Wrapper Implementation - Task Secondary Fields Update Endpoint)
+
+### Wrapper Contract
+- New route wired: `PATCH /api/v1/tasks/secondary-fields?taskId={id}`
+- Public request body:
+  - `fields[]` with:
+    - `label`
+    - `value`
+- Public behavior:
+  - Resolve each label against `GET /api/v1/tasks/{taskId}`
+  - Map labels to task-scoped `taskSecondaryFieldId`
+  - Forward only resolved IDs to `/Task/UpdateTaskSecondaryFieldsAjax`
+  - Refetch task detail and verify persisted values before returning success
+
+### Validation / Safety Rules
+- Reject empty `fields`
+- Reject duplicate labels in the same request
+- Reject labels that do not exist in the target task
+- Reject ambiguous labels if the task exposes the same normalized label more than once
+- Do not trust upstream `TaskID` semantics; treat `taskId` as wrapper-level validation input only
+
+### Local Smoke
+- Typecheck: `pnpm typecheck` -> `pass`
+- In-process app smoke:
+  - Login: `POST /api/v1/auth/login` -> `200`
+  - Update: `PATCH /api/v1/tasks/secondary-fields?taskId=9069` with `[{\"label\":\"Time Justification\",\"value\":\"wrapper-smoke-...\"}]` -> `200`
+  - Verification:
+    - Response returned updated `secondaryFields`
+    - Refetched value matched the requested value
+  - Restore:
+    - Same endpoint used to restore original `Time Justification` value -> `200`
+    - Restored value observed as `null`
+
+### Notes
+- Wrapper accepts partial updates even though the upstream UI usually serializes the full form.
+- Empty string requests are allowed; the verified task detail normalizes persisted empty values to `null`.
+
+Artifact JSON: `none (local in-process smoke + browser reverse engineering)`

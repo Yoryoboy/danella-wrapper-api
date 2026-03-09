@@ -9,6 +9,7 @@ import type {
   GetTaskDetailUseCase,
   GetTaskFormMetadataUseCase,
   ListTasksUseCase,
+  UpdateTaskSecondaryFieldsUseCase,
 } from "../application";
 import {
   createTaskBodySchema,
@@ -18,6 +19,7 @@ import {
   taskFormMetadataQuerySchema,
   taskIdParamsSchema,
   taskIdQuerySchema,
+  updateTaskSecondaryFieldsBodySchema,
 } from "./tasks.schemas";
 
 export class TasksController {
@@ -25,6 +27,7 @@ export class TasksController {
     private readonly listTasksUseCase: ListTasksUseCase,
     private readonly createTaskUseCase: CreateTaskUseCase,
     private readonly getProjectSecondaryFieldsUseCase: GetProjectSecondaryFieldsUseCase,
+    private readonly updateTaskSecondaryFieldsUseCase: UpdateTaskSecondaryFieldsUseCase,
     private readonly getTaskDetailUseCase: GetTaskDetailUseCase,
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
     private readonly getTaskFormMetadataUseCase: GetTaskFormMetadataUseCase,
@@ -155,6 +158,46 @@ export class TasksController {
         },
         upstream: result.upstream,
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateSecondaryFields: RequestHandler = async (req, res, next) => {
+    const parsedQuery = taskIdQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", {
+          fields: parsedQuery.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const parsedBody = updateTaskSecondaryFieldsBodySchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid request body", {
+          fields: parsedBody.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    try {
+      const result = await this.updateTaskSecondaryFieldsUseCase.execute({
+        cookieHeader,
+        taskId: parsedQuery.data.taskId,
+        fields: parsedBody.data.fields,
+      });
+
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

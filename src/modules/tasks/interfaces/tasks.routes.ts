@@ -6,6 +6,7 @@ import {
   GetTaskDetailUseCase,
   GetTaskFormMetadataUseCase,
   ListTasksUseCase,
+  UpdateTaskSecondaryFieldsUseCase,
 } from "../application";
 import { DanellaTaskClient } from "../infrastructure";
 import { TasksController } from "./tasks.controller";
@@ -15,6 +16,7 @@ export const createTasksRouter = (): Router => {
   const listTasksUseCase = new ListTasksUseCase(taskRepository);
   const createTaskUseCase = new CreateTaskUseCase(taskRepository);
   const getProjectSecondaryFieldsUseCase = new GetProjectSecondaryFieldsUseCase(taskRepository);
+  const updateTaskSecondaryFieldsUseCase = new UpdateTaskSecondaryFieldsUseCase(taskRepository);
   const getTaskDetailUseCase = new GetTaskDetailUseCase(taskRepository);
   const getTaskAttachmentsUseCase = new GetTaskAttachmentsUseCase(taskRepository);
   const getTaskFormMetadataUseCase = new GetTaskFormMetadataUseCase(taskRepository);
@@ -22,6 +24,7 @@ export const createTasksRouter = (): Router => {
     listTasksUseCase,
     createTaskUseCase,
     getProjectSecondaryFieldsUseCase,
+    updateTaskSecondaryFieldsUseCase,
     getTaskDetailUseCase,
     getTaskAttachmentsUseCase,
     getTaskFormMetadataUseCase,
@@ -32,6 +35,7 @@ export const createTasksRouter = (): Router => {
   router.post("/", tasksController.create);
   router.get("/", tasksController.list);
   router.get("/form-metadata", tasksController.formMetadata);
+  router.patch("/secondary-fields", tasksController.updateSecondaryFields);
   router.get("/secondary-fields", tasksController.projectSecondaryFields);
   router.get("/attachments", tasksController.attachments);
   router.get("/:taskId", tasksController.getById);

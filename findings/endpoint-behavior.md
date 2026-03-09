@@ -144,6 +144,11 @@ Interpretation:
 Interpretation:
 - Task secondary-field updates are keyed by task-scoped `TaskSecondaryFieldID`, not by project-scoped field IDs.
 - `GET /api/v1/tasks/:taskId` remains the authoritative source for `taskSecondaryFieldId` values needed for an eventual update endpoint.
+- Wrapper implementation notes (2026-03-09):
+  - Public contract: `PATCH /api/v1/tasks/secondary-fields?taskId={id}`.
+  - Public body fields: `fields[].label`, `fields[].value`.
+  - Wrapper resolves labels against `GET /api/v1/tasks/{taskId}`, forwards only resolved task-scoped IDs, and refetches the task to verify persistence.
+  - Wrapper intentionally does not trust upstream `success=true` without post-update verification because upstream accepts some invalid/no-op payloads.
 
 ## `/Task/GetAttachments?taskID={id}` (GET)
 

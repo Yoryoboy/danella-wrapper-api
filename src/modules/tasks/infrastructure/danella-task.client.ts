@@ -22,6 +22,8 @@ import {
   type ListTasksInput,
   type ListTasksResult,
   type ProjectSecondaryField,
+  type UpdateTaskSecondaryFieldsUpstreamInput,
+  type UpdateTaskSecondaryFieldsUpstreamResult,
   type TaskAssignmentControl,
   type TaskAssignmentRow,
   type TaskAssignedProjectCode,
@@ -748,6 +750,77 @@ export class DanellaTaskClient implements TaskRepository {
       };
     } catch (error) {
       throw toUpstreamAppError(error, { endpoint: "upstream task creation endpoint" });
+    }
+  }
+
+  async updateTaskSecondaryFields(
+    input: UpdateTaskSecondaryFieldsUpstreamInput,
+  ): Promise<UpdateTaskSecondaryFieldsUpstreamResult> {
+    const url = toAbsoluteUrl(env.danella.baseUrl, "/Task/UpdateTaskSecondaryFieldsAjax");
+
+    try {
+      const body = new URLSearchParams();
+      body.set("TaskID", String(input.taskId));
+
+      for (const field of input.fields) {
+        body.append(
+          `Fields[${field.taskSecondaryFieldId}].TaskSecondaryFieldID`,
+          String(field.taskSecondaryFieldId),
+        );
+        body.append(`Fields[${field.taskSecondaryFieldId}].Value`, field.value);
+      }
+
+      const response = await this.http.post<unknown>(url, body.toString(), {
+        headers: {
+          Cookie: input.cookieHeader,
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream task secondary fields update endpoint");
+      }
+
+      if (isRedirectedToLogin(response)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data === "string" && isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data !== "object" || response.data === null || Array.isArray(response.data)) {
+        throw new AppError(
+          502,
+          "UPSTREAM_PARSE_ERROR",
+          "Unexpected task secondary fields update response format from upstream",
+        );
+      }
+
+      const payload = response.data as { success?: unknown; message?: unknown };
+      const success =
+        typeof payload.success === "boolean"
+          ? payload.success
+          : response.status >= 200 && response.status < 300;
+
+      return {
+        success,
+        message:
+          typeof payload.message === "string"
+            ? payload.message
+            : success
+              ? "Secondary fields updated successfully."
+              : "Upstream task secondary fields update did not succeed",
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      throw toUpstreamAppError(error, { endpoint: "upstream task secondary fields update endpoint" });
     }
   }
 

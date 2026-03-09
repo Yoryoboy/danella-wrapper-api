@@ -11,6 +11,8 @@ import type {
   GetTaskFormMetadataResult,
   ListTasksInput,
   ListTasksResult,
+  UpdateTaskSecondaryFieldsUpstreamInput,
+  UpdateTaskSecondaryFieldsUpstreamResult,
 } from "./task.types";
 
 export interface TaskRepository {
@@ -20,4 +22,7 @@ export interface TaskRepository {
   getTaskFormMetadata(input: GetTaskFormMetadataInput): Promise<GetTaskFormMetadataResult>;
   getProjectSecondaryFields(input: GetProjectSecondaryFieldsInput): Promise<GetProjectSecondaryFieldsResult>;
   createTask(input: CreateTaskInput): Promise<CreateTaskResult>;
+  updateTaskSecondaryFields(
+    input: UpdateTaskSecondaryFieldsUpstreamInput,
+  ): Promise<UpdateTaskSecondaryFieldsUpstreamResult>;
 }

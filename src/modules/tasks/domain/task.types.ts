@@ -26,6 +26,21 @@ export interface CreateTaskInput {
   managerAreaId: number;
 }
 
+export interface UpdateTaskSecondaryFieldsInput {
+  cookieHeader: string;
+  taskId: number;
+  fields: Array<{
+    label: string;
+    value: string;
+  }>;
+}
+
+export interface ResolvedTaskSecondaryFieldUpdate {
+  taskSecondaryFieldId: number;
+  label: string;
+  value: string;
+}
+
 export interface UpstreamTask {
   taskID?: number;
   taskCode?: string;
@@ -250,6 +265,51 @@ export interface CreateTaskResult {
     endCustomerId: number;
     managerAreaId: number;
   };
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
+export interface UpdateTaskSecondaryFieldsResult {
+  success: boolean;
+  message: string;
+  data: {
+    taskId: number;
+    updatedFields: ResolvedTaskSecondaryFieldUpdate[];
+    secondaryFields: TaskSecondaryField[];
+  };
+  upstream: {
+    update: {
+      status: number;
+      url: string;
+    };
+    verification: {
+      deployment: {
+        status: number;
+        url: string;
+      };
+      attachments: {
+        status: number;
+        url: string;
+      };
+      messages: {
+        status: number;
+        url: string;
+      };
+    };
+  };
+}
+
+export interface UpdateTaskSecondaryFieldsUpstreamInput {
+  cookieHeader: string;
+  taskId: number;
+  fields: ResolvedTaskSecondaryFieldUpdate[];
+}
+
+export interface UpdateTaskSecondaryFieldsUpstreamResult {
+  success: boolean;
+  message: string;
   upstream: {
     status: number;
     url: string;
