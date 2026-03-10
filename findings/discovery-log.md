@@ -808,3 +808,142 @@ Artifact JSON: `none (browser inspection + local implementation)`
 - Empty string requests are allowed; the verified task detail normalizes persisted empty values to `null`.
 
 Artifact JSON: `none (local in-process smoke + browser reverse engineering)`
+
+---
+## Run 2026-03-09 (Browser Reverse Engineering - Task Status Transition Actions)
+
+### Browser Evidence
+- Sub-project tasks page inspected: `GET https://danella-x.com/Task/TaskSubProject?SubProjectID=45` -> `200`
+- Task row for `9373` rendered with:
+  - visible status cell: `Backlog (To Do)`
+  - action buttons:
+    - `changeStatus(9373, 18, 'In Progress', this)`
+    - `changeStatus(9373, 19, 'On Hold', this)`
+    - `changeStatus(9373, 20, 'Cancelled', this)`
+- Frontend function observed:
+  - `POST /Task/SetTaskStatus`
+  - JSON body shape: `{"taskID": 9373, "action": <number>}`
+  - success path expects JSON with `success` and `statusName`
+
+### Verified Endpoint Behavior
+- `POST https://danella-x.com/Task/SetTaskStatus` -> `200`
+- Content type observed: `application/json; charset=utf-8`
+- Supported action values observed:
+  - `18`
+  - `19`
+  - `20`
+- Unsupported values tested:
+  - `3` -> `{"success":false,"message":"Invalid action."}`
+  - `16` -> `{"success":false,"message":"Invalid action."}`
+  - `17` -> `{"success":false,"message":"Invalid action."}`
+
+### Transition Results Observed On Task `9373`
+- Initial status: `Backlog (To Do)`
+- `action: 19`:
+  - response: `{"success":true,"statusName":"On Hold"}`
+  - subsequent list page status: `On Hold`
+- `action: 20`:
+  - response: `{"success":true,"statusName":"Cancelled"}`
+  - subsequent list page status: `Cancelled`
+- `action: 18` from `On Hold`:
+  - response: `{"success":true,"statusName":"Backlog (To Do)"}`
+  - subsequent list page status: `Backlog (To Do)`
+- `action: 18` from `Cancelled`:
+  - response: `{"success":true,"statusName":"Backlog (To Do)"}`
+  - subsequent list page status: `Backlog (To Do)`
+- `action: 18` from `Backlog (To Do)`:
+  - response: `{"success":true,"statusName":"Backlog (To Do)"}`
+  - no observable transition to `In Progress`
+
+### Interpretation
+- The legacy UI label for `action: 18` (`In Progress`) does not match the observed server behavior for task `9373`.
+- For the tested task, `action: 18` behaves like a reset/reopen action back to `Backlog (To Do)`, not a transition to the real `In Progress` status.
+- The endpoint accepts legacy `action` codes, not direct `taskStatusID` values.
+- `taskStatusID` and `action` are distinct concepts:
+  - `Backlog (To Do)` observed with `taskStatusID: 1`
+  - `In Progress` observed elsewhere in page data with `taskStatusID: 3`
+  - yet `action: 3` is rejected as invalid
+- Wrapper implementation should not assume button labels reflect actual upstream transition semantics; it should preserve the observed `action` contract or add its own explicit mapping layer.
+
+Artifact JSON: `none (browser inspection + direct authenticated POST validation)`
+
+### Follow-up Run 2026-03-09 (Expanded Transition Matrix + Hidden Close Action)
+
+Additional direct browser-side `fetch` validation on `POST /Task/SetTaskStatus` showed:
+
+- Only these action values were accepted during the sweep on task `9373`:
+  - `18`
+  - `19`
+  - `20`
+  - `21`
+- `1..17` and `22..25` all returned:
+  - `{"success":false,"message":"Invalid action."}`
+
+#### Newly Discovered Action
+- `action: 21` is valid and transitions tasks to `Closed`.
+
+#### Transition Matrix Observed
+
+- Task `9373` (initially `Backlog (To Do)`):
+  - `20` -> `Cancelled`
+  - `19` from `Cancelled` -> `On Hold`
+  - `18` from `On Hold` -> `Backlog (To Do)`
+  - `21` from `Cancelled` or `Backlog (To Do)` -> `Closed`
+  - `18` from `Closed` -> `Closed`
+  - `19` from `Closed` -> `On Hold`
+  - `20` from `Closed` was not directly tested on this task, but see task `6342` below
+
+- Task `6342` (initially `In Progress`):
+  - `18` from `In Progress` -> `In Progress` (idempotent)
+  - `19` from `In Progress` -> `On Hold`
+  - `20` from `In Progress` -> `Cancelled`
+  - `18` from `Cancelled` -> `In Progress`
+  - `18` from `On Hold` -> `In Progress`
+  - `21` from `In Progress` -> `Closed`
+  - after task became `Closed`:
+    - `19` -> `On Hold`
+    - `20` -> `Cancelled`
+    - `18` from either `On Hold` or `Cancelled` -> `Closed`
+
+- Task `6335` (initially `Ready for Invoicing`):
+  - `18` from `Ready for Invoicing` -> `Ready for Invoicing` (idempotent)
+  - `19` from `Ready for Invoicing` -> `On Hold`
+  - `18` from `On Hold` -> `Ready for Invoicing`
+  - `20` from `Ready for Invoicing` -> `Cancelled`
+  - `18` from `Cancelled` -> `Ready for Invoicing`
+  - `21` from `Ready for Invoicing` -> `Closed`
+  - after task became `Closed`:
+    - `19` -> `On Hold`
+    - `18` from `On Hold` -> `Closed`
+
+- Task `6337` (initially `Customer Approved / Rejected`):
+  - `18` from `Customer Approved / Rejected` -> `Customer Approved / Rejected` (idempotent)
+  - `19` from `Customer Approved / Rejected` -> `On Hold`
+  - `18` from `On Hold` -> `Customer Approved / Rejected`
+  - `20` from `Customer Approved / Rejected` -> `Cancelled`
+  - `18` from `Cancelled` -> `Customer Approved / Rejected`
+  - `21` from `Customer Approved / Rejected` -> `Closed`
+  - after task became `Closed`:
+    - `19` -> `On Hold`
+    - `18` from `On Hold` -> `Closed`
+
+#### Updated Interpretation
+- `action: 18` is not globally “set status to In Progress”.
+- `action: 18` behaves as “return to the task's base workflow status”.
+- The base workflow status is task-specific:
+  - `9373` -> `Backlog (To Do)`
+  - `6342` -> `In Progress`
+  - `6335` -> `Ready for Invoicing`
+  - `6337` -> `Customer Approved / Rejected`
+- `action: 19` consistently behaves like a temporary transition to `On Hold`.
+- `action: 20` consistently behaves like a temporary transition to `Cancelled`.
+- `action: 21` transitions the task to `Closed` and appears to overwrite the task's “return/base” status:
+  - once a task has been closed, later `18` returns it to `Closed`, not to its former base state.
+
+Final states after expanded testing:
+- `9373` -> `Closed`
+- `6342` -> `Closed`
+- `6335` -> `Closed`
+- `6337` -> `Closed`
+
+Artifact JSON: `none (browser-side fetch matrix against live test tasks)`

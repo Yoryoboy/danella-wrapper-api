@@ -208,6 +208,54 @@ Interpretation:
 - Upstream creation action is non-REST naming.
 - Wrapper should expose RESTful create endpoint and internally translate field names and route.
 
+## `/Task/SetTaskStatus` (POST)
+
+- Status observed: `200`
+- Content type: `application/json; charset=utf-8`
+- Request content type: `application/json`
+- Request body shape observed:
+  - `{"taskID":9373,"action":18}`
+  - `{"taskID":9373,"action":19}`
+  - `{"taskID":9373,"action":20}`
+- Frontend usage observed:
+  - Task list page (`/Task/TaskSubProject?SubProjectID=45`) renders buttons:
+    - `changeStatus(taskID, 18, 'In Progress', this)`
+    - `changeStatus(taskID, 19, 'On Hold', this)`
+    - `changeStatus(taskID, 20, 'Cancelled', this)`
+  - Frontend posts only `taskID` and `action` and expects JSON with:
+    - `success` (boolean)
+    - `statusName` (string)
+- Response behavior observed on task `9373`:
+  - `action: 19` -> `{"success":true,"statusName":"On Hold"}`
+  - `action: 20` -> `{"success":true,"statusName":"Cancelled"}`
+  - `action: 18` from `On Hold` -> `{"success":true,"statusName":"Backlog (To Do)"}`
+  - `action: 18` from `Cancelled` -> `{"success":true,"statusName":"Backlog (To Do)"}`
+  - `action: 18` from `Backlog (To Do)` -> `{"success":true,"statusName":"Backlog (To Do)"}`
+  - unsupported values such as `3`, `16`, `17` -> `{"success":false,"message":"Invalid action."}`
+
+Interpretation:
+- Upstream accepts legacy transition `action` codes, not direct `taskStatusID` values.
+- The visible UI label for `action: 18` (`In Progress`) is misleading for the tested task; observed behavior resets or keeps the task in `Backlog (To Do)`.
+- Wrapper should model status transitions as an explicit mapping/command layer rather than assuming the UI button label equals the resulting upstream status.
+
+Expanded interpretation from additional browser-side validation:
+- Accepted action values observed: `18`, `19`, `20`, `21`
+- Invalid action values observed: `1..17`, `22..25`
+- `action: 19` consistently maps to `On Hold`
+- `action: 20` consistently maps to `Cancelled`
+- `action: 21` maps to `Closed`
+- `action: 18` is contextual and behaves as “return to this task's base workflow status”, not “set In Progress”
+
+Observed examples of `action: 18`:
+- Task `9373` base status: `Backlog (To Do)`
+- Task `6342` base status: `In Progress`
+- Task `6335` base status: `Ready for Invoicing`
+- Task `6337` base status: `Customer Approved / Rejected`
+
+Observed examples after `action: 21` (`Closed`):
+- Once a task has been transitioned to `Closed`, later `action: 18` returns it to `Closed`
+- This suggests `Closed` becomes the new persisted base/return status for subsequent `18` transitions
+
 ## Modal Code Source (`Add Project Codes`)
 
 - No dedicated network call observed when opening the modal to load the initial list.
