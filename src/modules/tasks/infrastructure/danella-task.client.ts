@@ -9,6 +9,8 @@ import { isRedirectedToLogin } from "../../../shared/infrastructure/response.uti
 import { toUpstreamAppError } from "../../../shared/infrastructure/upstream-error.utils";
 import { toAbsoluteUrl } from "../../../shared/infrastructure/url.utils";
 import {
+  type DeleteTaskInput,
+  type DeleteTaskResult,
   type GetTaskAttachmentsInput,
   type GetTaskAttachmentsResult,
   type GetTaskDeploymentInput,
@@ -376,6 +378,53 @@ export class DanellaTaskClient implements TaskRepository {
       };
     } catch (error) {
       throw toUpstreamAppError(error, { endpoint: "upstream attachments endpoint" });
+    }
+  }
+
+  async deleteTask(input: DeleteTaskInput): Promise<DeleteTaskResult> {
+    const url = toAbsoluteUrl(
+      env.danella.baseUrl,
+      `/Task/DeleteTask?taskID=${encodeURIComponent(String(input.taskId))}`,
+    );
+
+    try {
+      const response = await this.http.post<unknown>(url, undefined, {
+        headers: { Cookie: input.cookieHeader },
+        maxRedirects: 0,
+        validateStatus: () => true,
+      });
+
+      if (response.status >= 500) {
+        throw new AppError(503, "UPSTREAM_UNAVAILABLE", "Could not reach upstream task delete endpoint");
+      }
+
+      if (isRedirectedToLogin(response)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      if (typeof response.data === "string" && isLoginHtml(response.data)) {
+        throw new AppError(401, "SESSION_EXPIRED", "Danella session is expired or invalid");
+      }
+
+      const payload = typeof response.data === "object" && response.data !== null ? response.data : {};
+      const success =
+        typeof (payload as { success?: unknown }).success === "boolean"
+          ? Boolean((payload as { success?: boolean }).success)
+          : response.status >= 200 && response.status < 300;
+
+      return {
+        success,
+        message:
+          typeof (payload as { message?: unknown }).message === "string"
+            ? ((payload as { message?: string }).message ?? undefined)
+            : undefined,
+        upstream: {
+          status: response.status,
+          url,
+        },
+      };
+    } catch (error) {
+      throw toUpstreamAppError(error, { endpoint: "upstream task delete endpoint" });
     }
   }
 }

@@ -649,3 +649,26 @@ Artifact JSON: `none (local wrapper smoke + in-process script)`
 Artifact file: `findings/runs/2026-03-04-task-subproject-sanitized.html`
 
 ---
+## Run 2026-03-11 (Browser Network Inspection - Task Delete Flow)
+
+### Observed Requests
+- Task list page before delete: `GET https://danella-x.com/Task/TaskSubProject?SubProjectID=45` -> `200`
+- Delete action: `POST https://danella-x.com/Task/DeleteTask?taskID=9373` -> `200`
+- Request body observed: empty (`content-length: 0`)
+- Post-delete refresh: `GET https://danella-x.com/Task/TaskSubProject?SubProjectID=45` -> `200`
+
+### Frontend Behavior Findings
+- Delete button is wired to `deleteTask(taskID)` in page script.
+- Legacy frontend issues:
+  - `fetch('/Task/DeleteTask?taskID=${taskID}', { method: 'POST' })`
+  - expects JSON with `success`
+  - reloads the sub-project page after a successful delete
+
+### Notes
+- Upstream delete uses query string `taskID`, not JSON body.
+- No anti-CSRF token/header was observed in the request; authenticated cookies were sufficient in this browser flow.
+- Wrapper contract should keep stable query param naming with `DELETE /api/v1/tasks?taskId=...` and translate internally to legacy upstream naming.
+
+Artifact JSON: `none (captured from browser devtools inspection)`
+
+---

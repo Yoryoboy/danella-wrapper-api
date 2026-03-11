@@ -1,6 +1,6 @@
 # Endpoint Behavior Notes
 
-Updated: 2026-03-04
+Updated: 2026-03-11
 
 ## `/Home/Login` (GET)
 
@@ -101,6 +101,23 @@ Interpretation:
 
 Interpretation:
 - Attachments are served by a direct JSON endpoint and can be proxied without HTML scraping.
+
+## `/Task/DeleteTask?taskID={id}` (POST)
+
+- Status observed: `200`
+- Content type: `application/json; charset=utf-8`
+- Request shape observed:
+  - query string only: `taskID={id}`
+  - request body: empty (`content-length: 0`)
+- Browser behavior observed:
+  - frontend calls `fetch('/Task/DeleteTask?taskID=${taskID}', { method: 'POST' })`
+  - frontend expects JSON with `success` (boolean)
+  - on success, UI shows confirmation and reloads `TaskSubProject`
+
+Interpretation:
+- Upstream deletion uses a non-REST `POST` with query string input instead of JSON body.
+- Wrapper should expose RESTful `DELETE /api/v1/tasks?taskId=...` and internally translate `taskId` to upstream `taskID`.
+- Because no CSRF token/header was observed in the browser request, forwarding the authenticated cookie header appears sufficient for this action.
 
 ## `/Task/DeleteTaskProjectCode` (POST)
 

@@ -411,6 +411,81 @@ Query param contract:
 }
 ```
 
+- `DELETE /api/v1/tasks?taskId=9373`
+- Description: Deletes a task by mapping the wrapper query param to upstream legacy delete action `POST /Task/DeleteTask?taskID={taskId}`.
+- Query params:
+  - `taskId` (required, integer)
+- Auth input:
+  - `x-danella-cookie: <cookieHeader>` header, or
+  - standard `Cookie` header
+- Response `200` (successful upstream delete):
+
+```json
+{
+  "success": true,
+  "message": "Deleted successfully",
+  "meta": {
+    "taskId": 9373
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/DeleteTask?taskID=9373"
+  }
+}
+```
+
+- Response `409` (upstream responds non-success):
+
+```json
+{
+  "success": false,
+  "message": "The task could not be deleted.",
+  "meta": {
+    "taskId": 9373
+  },
+  "upstream": {
+    "status": 200,
+    "url": "https://danella-x.com/Task/DeleteTask?taskID=9373"
+  }
+}
+```
+
+- Response `400`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "x-danella-cookie or Cookie header is required"
+  }
+}
+```
+
+- Response `401`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "SESSION_EXPIRED",
+    "message": "Danella session is expired or invalid"
+  }
+}
+```
+
+- Response `503`:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "UPSTREAM_UNAVAILABLE",
+    "message": "Could not reach upstream task delete endpoint"
+  }
+}
+```
+
 ### Codes
 
 - `GET /api/v1/codes/available?taskId=6342`
@@ -605,6 +680,7 @@ The endpoints are documented in Postman collection:
 - Request: `List Tasks By SubProject`
 - Request: `Get Task Deployment`
 - Request: `Get Task Attachments`
+- Request: `Delete Task`
 - Folder: `Codes`
 - Request: `Get Available Task Project Codes`
 - Request: `Get Task Project Code Detail`

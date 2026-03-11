@@ -3,6 +3,7 @@ import type { RequestHandler } from "express";
 import { AppError } from "../../../shared/domain/app-error";
 import { getCookieHeader } from "../../../shared/interfaces/http/get-cookie-header";
 import type {
+  DeleteTaskUseCase,
   GetTaskAttachmentsUseCase,
   GetTaskDeploymentUseCase,
   GetTaskFormMetadataUseCase,
@@ -20,6 +21,7 @@ export class TasksController {
     private readonly listTasksUseCase: ListTasksUseCase,
     private readonly getTaskDeploymentUseCase: GetTaskDeploymentUseCase,
     private readonly getTaskAttachmentsUseCase: GetTaskAttachmentsUseCase,
+    private readonly deleteTaskUseCase: DeleteTaskUseCase,
     private readonly getTaskFormMetadataUseCase: GetTaskFormMetadataUseCase,
   ) {}
 
@@ -100,6 +102,41 @@ export class TasksController {
           taskId: result.taskId,
           portfolioList: result.portfolioList,
           assignedProjectCodes: result.assignedProjectCodes,
+        },
+        upstream: result.upstream,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  delete: RequestHandler = async (req, res, next) => {
+    const parsedQuery = taskIdQuerySchema.safeParse(req.query);
+    if (!parsedQuery.success) {
+      next(
+        new AppError(400, "VALIDATION_ERROR", "Invalid query parameters", {
+          fields: parsedQuery.error.flatten(),
+        }),
+      );
+      return;
+    }
+
+    const cookieHeader = getCookieHeader(req);
+    if (!cookieHeader) {
+      next(new AppError(400, "VALIDATION_ERROR", "x-danella-cookie or Cookie header is required"));
+      return;
+    }
+
+    try {
+      const result = await this.deleteTaskUseCase.execute({
+        taskId: parsedQuery.data.taskId,
+        cookieHeader,
+      });
+      res.status(result.success ? 200 : 409).json({
+        success: result.success,
+        message: result.message,
+        meta: {
+          taskId: parsedQuery.data.taskId,
         },
         upstream: result.upstream,
       });

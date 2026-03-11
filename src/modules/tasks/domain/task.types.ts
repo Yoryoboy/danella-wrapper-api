@@ -77,6 +77,11 @@ export interface GetTaskAttachmentsInput {
   taskId: number;
 }
 
+export interface DeleteTaskInput {
+  cookieHeader: string;
+  taskId: number;
+}
+
 export interface GetTaskAttachmentsResult {
   taskId: number;
   attachments: TaskAttachment[];
@@ -99,6 +104,15 @@ export interface ListTasksResult {
     status?: string;
     search?: string;
   };
+  upstream: {
+    status: number;
+    url: string;
+  };
+}
+
+export interface DeleteTaskResult {
+  success: boolean;
+  message?: string;
   upstream: {
     status: number;
     url: string;
